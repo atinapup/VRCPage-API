@@ -1,0 +1,22 @@
+{
+  "name": "vrcpage-api",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "db:bootstrap": "node --env-file=.env scripts/db.mjs bootstrap",
+    "db:migrate": "dbmate --no-dump-schema migrate && node --env-file=.env scripts/db.mjs ensure-partitions",
+    "db:rollback": "dbmate --no-dump-schema rollback",
+    "db:status": "dbmate status",
+    "db:test": "node --env-file=.env scripts/db.mjs test",
+    "db:maintain": "node --env-file=.env scripts/db.mjs maintain"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "dbmate": "^2.36.0"
+  }
+}
