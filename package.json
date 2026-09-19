@@ -6,12 +6,16 @@
     "node": ">=22"
   },
   "scripts": {
-    "db:bootstrap": "node --env-file=.env scripts/db.mjs bootstrap",
-    "db:migrate": "dbmate --no-dump-schema migrate && node --env-file=.env scripts/db.mjs ensure-partitions",
-    "db:rollback": "dbmate --no-dump-schema rollback",
-    "db:status": "dbmate status",
-    "db:test": "node --env-file=.env scripts/db.mjs test",
-    "db:maintain": "node --env-file=.env scripts/db.mjs maintain"
+    "db:bootstrap": "node scripts/db.mjs bootstrap",
+    "db:migrate": "node scripts/db.mjs migrate",
+    "db:rollback": "node scripts/db.mjs rollback",
+    "db:status": "node scripts/db.mjs status",
+    "db:test": "node scripts/db.mjs test",
+    "db:maintain": "node scripts/db.mjs maintain",
+    "db:bootstrap:prod": "node scripts/db.mjs bootstrap --prod",
+    "db:migrate:prod": "node scripts/db.mjs migrate --prod",
+    "db:status:prod": "node scripts/db.mjs status --prod",
+    "db:maintain:prod": "node scripts/db.mjs maintain --prod"
   },
   "dependencies": {
     "pg": "^8.23.0"

@@ -6,21 +6,44 @@ One Postgres database holds everything vrc.page stores. The SQL files in `db/mig
 
 Everything runs against your existing Postgres server (version 15 or later; 18 preferred). Nothing here installs or runs Postgres.
 
-1. Copy `.env.example` to `.env` and fill it in. `ADMIN_DATABASE_URL` is a superuser on your server.
+### Two environments
+
+| | Development | Production |
+|---|---|---|
+| Settings file | `.env.development` | `.env.production` |
+| Database | `vrcpage_dev` | `vrcpage` |
+| Logins | `vrcpage_dev_*` | `vrcpage_prod_*` |
+| Commands | `npm run db:<command>` | `npm run db:<command>:prod` |
+
+Each file is split into:
+- the server: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_SSL_MODE`,
+- an admin login (`DB_ADMIN_*`, a superuser),
+- a user and password for each login.
+
+Every command prints which environment and database it is about to touch.
+
+Both environments can live on the same server, and a development login still can't open the production database. Each database lets in only its own environment's logins; see [Roles](#roles).
+
+### First time, per environment
+
+1. Copy `.env.<environment>.example` to `.env.<environment>` and fill in the passwords. Use different passwords for production.
 2. `npm install`
-3. `npm run db:bootstrap` creates the roles and the database named by `VRCPAGE_DATABASE`. It is safe to re-run, and resets the role passwords when you do.
-4. `npm run db:migrate` applies the migrations as `vrcpage_migrator`, then creates the upcoming partitions.
-5. `npm run db:test` runs `db/tests/invariants.sql` as the admin and rolls it back, so it leaves nothing behind.
+3. `npm run db:bootstrap` (or `db:bootstrap:prod`) creates the roles, this environment's logins and its database. It is safe to re-run, and resets the passwords when you do.
+4. `npm run db:migrate` (or `db:migrate:prod`) applies the migrations, then creates the upcoming partitions.
+5. `npm run db:test` runs `db/tests/invariants.sql` on development and rolls it back, so it leaves nothing behind.
 
-Try it on a throwaway database first: set `VRCPAGE_DATABASE=vrcpage_verify` and point `DATABASE_URL` at it. Then switch both to `vrcpage`.
+### Everyday flow
 
-| Command | What it does |
-|---|---|
-| `npm run db:migrate` | Apply pending migrations and create partitions |
-| `npm run db:rollback` | Undo the latest migration |
-| `npm run db:status` | List applied and pending migrations |
-| `npm run db:test` | Invariant checks (rolled back) |
-| `npm run db:maintain` | Run the nightly maintenance once, by hand |
+Write a new migration and apply it to development with `db:migrate`. Undo it with `db:rollback` while you iterate. Run `db:test`. Only then run `db:migrate:prod`.
+
+| Command | Development | Production | What it does |
+|---|---|---|---|
+| bootstrap | `db:bootstrap` | `db:bootstrap:prod` | Roles, logins, database |
+| migrate | `db:migrate` | `db:migrate:prod` | Apply pending migrations and create partitions |
+| status | `db:status` | `db:status:prod` | List applied and pending migrations |
+| maintain | `db:maintain` | `db:maintain:prod` | Run the nightly maintenance once, by hand |
+| rollback | `db:rollback` | refused | Undo the latest migration. In production it would drop tables with their data, so production only moves forward: write a new migration instead |
+| test | `db:test` | refused | Invariant checks (rolled back) |
 
 ## Schemas
 
@@ -133,14 +156,23 @@ Also:
 
 ## Roles
 
-| Role | Used by | Can |
+The migrations grant permissions to five fixed roles, which are shared by every environment and **never log in**. Each environment has its own logins, which are members of those roles.
+
+Isolation comes from two rules, set by bootstrap:
+- A database grants CONNECT only to its own environment's logins, never to the shared roles.
+- The migrator is a member of `vrcpage_owner` without inheriting its rights. It reaches the owner only by switching to it (`SET role`) after it has connected.
+
+Together these mean a development login can't even connect to the production database.
+
+`audit.row_changes.db_role` records the login that made each change, so history also shows which environment it came from.
+
+| Role | Login in `.env.<environment>` | Can |
 |---|---|---|
-| `vrcpage_owner` | nobody logs in | Owns every object |
-| `vrcpage_migrator` | dbmate | Acts as the owner (`SET role` on login) |
-| `vrcpage_api` | the API | Read and write state tables within the locks above. Never sees tokens, passwords or codes |
-| `vrcpage_auth` | Better Auth's pool | Only the five Better Auth tables, with `search_path = auth` |
-| `vrcpage_maintenance` | nightly job | Only `internal.run_maintenance()` |
-| `vrcpage_readonly` | SQL browsing, admin | SELECT on everything except secret columns |
+| `vrcpage_owner` | `DB_MIGRATOR_USER` (`vrcpage_dev_migrator` / `vrcpage_prod_migrator`) | Owns every object. The migrator switches to it on login |
+| `vrcpage_api` | `DB_API_USER` | Read and write state tables within the locks above. Never sees tokens, passwords or codes |
+| `vrcpage_auth` | `DB_AUTH_USER` | Only the five Better Auth tables. The login gets `search_path = auth` |
+| `vrcpage_maintenance` | `DB_MAINTENANCE_USER` | Only `internal.run_maintenance()` |
+| `vrcpage_readonly` | `DB_READONLY_USER` | SELECT on everything except secret columns |
 
 ## Better Auth mapping
 
@@ -149,7 +181,13 @@ import { Pool, types } from "pg";
 types.setTypeParser(20, Number); // int8 as number; the rate limiter does arithmetic on it
 
 betterAuth({
-  database: new Pool({ connectionString: process.env.AUTH_DATABASE_URL }),
+  database: new Pool({
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT),
+    database: process.env.DB_NAME,
+    user: process.env.DB_AUTH_USER,
+    password: process.env.DB_AUTH_PASSWORD,
+  }),
   advanced: { database: { generateId: false } }, // Postgres generates uuidv7
   user: {
     modelName: "accounts",
