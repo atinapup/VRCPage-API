@@ -1,0 +1,3 @@
+# Generated files. LF everywhere so the api:spec:check and db:types:check drift checks agree on every OS.
+openapi.json text eol=lf
+src/database/database.types.ts text eol=lf

@@ -1,4 +1,15 @@
 node_modules/
+dist/
 .env
 .env.*
 !.env.*.example
+
+# tools
+CLAUDE.md
+AGENTS.md
+.claude
+
+# Vendored agent skills (Apple HIG reference docs) — not project code
+.agents/
+.claude/skills/
+graphify-out/

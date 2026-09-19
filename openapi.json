@@ -1,0 +1,149 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "healthLive",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Liveness"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liveness: the process is running.",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "healthReady",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readiness"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readiness: the database answers and partitions exist 7 days ahead; 503 otherwise.",
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "vrc.page API",
+    "description": "The backend for vrc.page. Errors use RFC 9457 Problem Details (application/problem+json), and every response carries an X-Request-Id header.",
+    "version": "1",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "health",
+      "description": "Liveness and readiness probes for load balancers and uptime checks."
+    }
+  ],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "Liveness": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "Readiness": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string",
+            "description": "development or production."
+          }
+        },
+        "required": [
+          "status",
+          "environment"
+        ]
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status code.",
+            "example": 404
+          },
+          "type": {
+            "type": "string",
+            "description": "A URI naming the kind of problem; \"about:blank\" when the status says it all."
+          },
+          "title": {
+            "type": "string",
+            "description": "Short, human-readable summary of the kind of problem."
+          },
+          "detail": {
+            "type": "string",
+            "description": "What went wrong this time, in words a person can act on."
+          },
+          "instance": {
+            "type": "string",
+            "description": "The path of the request that failed."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Same as the X-Request-Id response header and the request's audit log entries."
+          }
+        },
+        "required": [
+          "status",
+          "type",
+          "title",
+          "requestId"
+        ]
+      }
+    }
+  }
+}

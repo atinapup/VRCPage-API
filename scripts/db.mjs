@@ -7,6 +7,7 @@
 //   npm run db:status      list applied and pending migrations
 //   npm run db:test        run db/tests/invariants.sql, rolled back (development only)
 //   npm run db:maintain    run the nightly maintenance once, by hand
+//   npm run db:types       generate the API's Kysely types from the database (development only)
 //
 // Each has a :prod twin (db:migrate:prod, ...) except the development-only ones.
 import { spawnSync } from 'node:child_process';
@@ -21,8 +22,9 @@ const environment = flags.includes('--prod') ? 'production' : 'development';
 const envFile = `.env.${environment}`;
 
 // Production only moves forward: a rollback drops tables with their data, and
-// the tests are for trying things out.
-const DEVELOPMENT_ONLY = new Set(['rollback', 'test']);
+// the tests are for trying things out. Types come from development, which is
+// always at least as far along as production.
+const DEVELOPMENT_ONLY = new Set(['rollback', 'test', 'types']);
 
 // The migrations grant permissions to these roles. The roles never log in;
 // each environment has its own logins that are members of them, and each
@@ -211,6 +213,25 @@ async function test() {
   console.log('All invariant checks passed.');
 }
 
+// src/database/database.types.ts, read as the migrator (the owner sees every
+// table). Partitions are left out; with --check it only verifies the file.
+function types() {
+  const args = [
+    'node_modules/kysely-codegen/dist/cli/bin.js',
+    '--dialect', 'postgres',
+    '--camel-case',
+    '--exclude-pattern', 'public.schema_migrations',
+    '--out-file', 'src/database/database.types.ts',
+    ...(flags.includes('--check') ? ['--verify'] : []),
+  ];
+  const result = spawnSync(process.execPath, args, {
+    stdio: 'inherit',
+    env: { ...process.env, DATABASE_URL: connectionUrl(connection('migrator')) },
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
 async function maintain() {
   await withClient(connection('maintenance'), async (db) => {
     const { rows } = await db.query('SELECT internal.run_maintenance() AS summary');
@@ -225,6 +246,7 @@ const commands = {
   status: async () => dbmate('status'),
   test,
   maintain,
+  types: async () => types(),
 };
 const command = commands[commandName];
 if (!command) {

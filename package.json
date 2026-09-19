@@ -6,6 +6,14 @@
     "node": ">=22"
   },
   "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "api:spec": "nest build && node dist/scripts/generate-openapi.js",
+    "api:spec:check": "nest build && node dist/scripts/generate-openapi.js --check",
+    "db:types": "node scripts/db.mjs types",
+    "db:types:check": "node scripts/db.mjs types --check",
     "db:bootstrap": "node scripts/db.mjs bootstrap",
     "db:migrate": "node scripts/db.mjs migrate",
     "db:rollback": "node scripts/db.mjs rollback",
@@ -18,9 +26,22 @@
     "db:maintain:prod": "node scripts/db.mjs maintain --prod"
   },
   "dependencies": {
-    "pg": "^8.23.0"
+    "@nestjs/common": "^12.0.3",
+    "@nestjs/core": "^12.0.3",
+    "@nestjs/platform-express": "^12.0.3",
+    "@nestjs/swagger": "^12.0.1",
+    "kysely": "^0.29.6",
+    "pg": "^8.23.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "dbmate": "^2.36.0"
+    "@nestjs/cli": "^12.0.3",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.4",
+    "@types/pg": "^8.23.1",
+    "dbmate": "^2.36.0",
+    "kysely-codegen": "^0.20.0",
+    "typescript": "~6.0.2"
   }
 }
