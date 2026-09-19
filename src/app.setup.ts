@@ -30,6 +30,10 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
     )
     .setVersion('1')
     .addTag('health', 'Liveness and readiness probes for load balancers and uptime checks.')
+    .addTag('auth', 'Sign-in, sessions and account settings, on Better Auth. The session cookie belongs to the website, which forwards it.')
+    .addTag('pages', 'Public pages at vrc.page/<name>.')
+    .addTag('me', "The signed-in account's own pages and settings, for the dashboard.")
+    .addTag('dev', 'Development only: test-data shortcuts. Not registered in production.')
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {

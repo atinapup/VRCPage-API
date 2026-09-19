@@ -1,6 +1,496 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/v1/auth/providers": {
+      "get": {
+        "operationId": "authProviders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Providers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Which sign-in providers this server offers.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/sign-in-code": {
+      "post": {
+        "operationId": "authRequestSignInCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInCodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingSignIn"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send a sign-in code, once the Turnstile token passes. Same answer whether or not the address has an account.\nWithin the resend cooldown nothing is sent, and the answer says so (sent: false).",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/sign-in-code/resend": {
+      "post": {
+        "operationId": "authResendSignInCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendSignInCodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingSignIn"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send another code to the address a pending token names.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/sign-in": {
+      "post": {
+        "operationId": "authSignIn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sign in with a code; sets the session cookie. A first sign-in creates the account.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/social/{provider}/sign-in": {
+      "post": {
+        "operationId": "authSocialSignIn",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "discord",
+                "github"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SocialSignInRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderRedirect"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start signing in with Discord or GitHub: the address to send the browser to.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/social/{provider}/link": {
+      "post": {
+        "operationId": "authSocialLink",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "discord",
+                "github"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SocialLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderRedirect"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start connecting Discord or GitHub to the signed-in account.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/social/{provider}": {
+      "delete": {
+        "operationId": "authSocialUnlink",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "discord",
+                "github"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Disconnect Discord or GitHub. Needs a recent sign-in.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/session": {
+      "get": {
+        "operationId": "authSession",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The signed-in account; 401 when there is none.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/sign-out": {
+      "post": {
+        "operationId": "authSignOut",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sign out; clears the session cookie.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/sign-in-methods": {
+      "get": {
+        "operationId": "authSignInMethods",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInMethods"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Discord and GitHub: offered here, and attached to the signed-in account.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/email-change": {
+      "post": {
+        "operationId": "authRequestEmailChange",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailChangeStarted"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send a code to a new address. Needs a recent sign-in.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/email-change/confirm": {
+      "post": {
+        "operationId": "authConfirmEmailChange",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailChangeConfirmRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Switch to the new address with the code sent to it.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/account": {
+      "delete": {
+        "operationId": "authDeleteAccount",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete the signed-in account and everything it owns. Needs a recent sign-in; clears the session cookie.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "operationId": "healthLive",
@@ -64,6 +554,354 @@
           "health"
         ]
       }
+    },
+    "/v1/pages/{slug}": {
+      "get": {
+        "operationId": "pagesBySlug",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The public page at vrc.page/<slug>. Private, hidden, held and unknown names are one identical 404.",
+        "tags": [
+          "pages"
+        ]
+      }
+    },
+    "/v1/me/dashboard": {
+      "get": {
+        "operationId": "meDashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The dashboard's frame: the account's page, its groups, and what is waiting for it.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/page": {
+      "get": {
+        "operationId": "mePage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnUserPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The account's own page, whatever its visibility; 404 before VRChat is connected.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/groups/{pageId}": {
+      "get": {
+        "operationId": "meGroup",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnGroupPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "A group page this account owns or edits; 404 for any other.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/notification-preferences": {
+      "get": {
+        "operationId": "meNotificationPreferences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferences"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Which emails the account gets.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/dev/codes": {
+      "get": {
+        "operationId": "devCodes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SentCode"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The last few codes printed to the API's terminal, newest first.",
+        "tags": [
+          "dev"
+        ]
+      }
+    },
+    "/v1/dev/vrchat/connect": {
+      "post": {
+        "operationId": "devConnect",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevConnectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Connect the signed-in account to a test VRChat user and give its page a free name.",
+        "tags": [
+          "dev"
+        ]
+      }
+    },
+    "/v1/dev/vrchat/groups": {
+      "post": {
+        "operationId": "devClaimGroups",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Claim the public groups the connected test user owns, up to groups.max_per_user.",
+        "tags": [
+          "dev"
+        ]
+      }
+    },
+    "/v1/dev/vrchat/invite-from-orin": {
+      "post": {
+        "operationId": "devInviteFromOrin",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Orin (a stand-in account, made on first use) invites the signed-in account to edit Night Shift.",
+        "tags": [
+          "dev"
+        ]
+      }
+    },
+    "/v1/dev/vrchat/accept-invites": {
+      "post": {
+        "operationId": "devAcceptInvites",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Accept every invite waiting for the signed-in account.",
+        "tags": [
+          "dev"
+        ]
+      }
+    },
+    "/v1/dev/vrchat": {
+      "delete": {
+        "operationId": "devDisconnect",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Disconnect the test VRChat user: its page, groups and their pages go with it.",
+        "tags": [
+          "dev"
+        ]
+      }
     }
   },
   "info": {
@@ -76,11 +914,234 @@
     {
       "name": "health",
       "description": "Liveness and readiness probes for load balancers and uptime checks."
+    },
+    {
+      "name": "auth",
+      "description": "Sign-in, sessions and account settings, on Better Auth. The session cookie belongs to the website, which forwards it."
+    },
+    {
+      "name": "pages",
+      "description": "Public pages at vrc.page/<name>."
+    },
+    {
+      "name": "me",
+      "description": "The signed-in account's own pages and settings, for the dashboard."
+    },
+    {
+      "name": "dev",
+      "description": "Development only: test-data shortcuts. Not registered in production."
     }
   ],
   "servers": [],
   "components": {
     "schemas": {
+      "Providers": {
+        "type": "object",
+        "properties": {
+          "discord": {
+            "type": "boolean"
+          },
+          "github": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "discord",
+          "github"
+        ]
+      },
+      "SignInCodeRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The address to send the code to."
+          },
+          "botCheckToken": {
+            "type": "string",
+            "description": "The Turnstile token from the sign-in form's widget."
+          }
+        },
+        "required": [
+          "email",
+          "botCheckToken"
+        ]
+      },
+      "PendingSignIn": {
+        "type": "object",
+        "properties": {
+          "pendingToken": {
+            "type": "string",
+            "description": "The address, dated when its code went out and signed:\n`<sent at ms>.<signature>.<email>`. Keep it (the website uses an httpOnly\ncookie) and hand it back to resend without another bot check. Valid as\nlong as the code."
+          },
+          "sent": {
+            "type": "boolean",
+            "description": "False inside the resend cooldown: the code sent moments ago still stands."
+          },
+          "resendIn": {
+            "type": "number",
+            "description": "Seconds before another code can be sent."
+          }
+        },
+        "required": [
+          "pendingToken",
+          "sent",
+          "resendIn"
+        ]
+      },
+      "ResendSignInCodeRequest": {
+        "type": "object",
+        "properties": {
+          "pendingToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pendingToken"
+        ]
+      },
+      "SignInRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "The digits from the email; anything else in it is ignored."
+          }
+        },
+        "required": [
+          "email",
+          "code"
+        ]
+      },
+      "SocialSignInRequest": {
+        "type": "object",
+        "properties": {
+          "callbackURL": {
+            "type": "string",
+            "description": "A path on the website, such as /dashboard."
+          },
+          "errorCallbackURL": {
+            "type": "string",
+            "description": "A path on the website; the provider's `error` is added to its query."
+          }
+        },
+        "required": [
+          "callbackURL",
+          "errorCallbackURL"
+        ]
+      },
+      "ProviderRedirect": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "SocialLinkRequest": {
+        "type": "object",
+        "properties": {
+          "callbackURL": {
+            "type": "string",
+            "description": "A path on the website; on failure it gets an `error` query parameter."
+          }
+        },
+        "required": [
+          "callbackURL"
+        ]
+      },
+      "SessionInfo": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "description": "The account's own address, for its settings. Never shown anywhere public."
+          }
+        },
+        "required": [
+          "accountId",
+          "email"
+        ]
+      },
+      "SignInMethod": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "Offered on this server."
+          },
+          "connected": {
+            "type": "boolean",
+            "description": "Attached to the signed-in account."
+          }
+        },
+        "required": [
+          "configured",
+          "connected"
+        ]
+      },
+      "SignInMethods": {
+        "type": "object",
+        "properties": {
+          "discord": {
+            "$ref": "#/components/schemas/SignInMethod"
+          },
+          "github": {
+            "$ref": "#/components/schemas/SignInMethod"
+          }
+        },
+        "required": [
+          "discord",
+          "github"
+        ]
+      },
+      "EmailChangeRequest": {
+        "type": "object",
+        "properties": {
+          "newEmail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "newEmail"
+        ]
+      },
+      "EmailChangeStarted": {
+        "type": "object",
+        "properties": {
+          "resendIn": {
+            "type": "number",
+            "description": "Seconds before another code can be sent to this address."
+          }
+        },
+        "required": [
+          "resendIn"
+        ]
+      },
+      "EmailChangeConfirmRequest": {
+        "type": "object",
+        "properties": {
+          "newEmail": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "newEmail",
+          "code"
+        ]
+      },
       "Liveness": {
         "type": "object",
         "properties": {
@@ -108,6 +1169,495 @@
           "environment"
         ]
       },
+      "RepresentedGroup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "PageLink": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "description": "The label its owner gave it, for links added on vrc.page."
+          },
+          "source": {
+            "enum": [
+              "vrchat",
+              "vrcpage"
+            ],
+            "type": "string",
+            "description": "vrchat: from the VRChat bio or group. vrcpage: added on vrc.page."
+          },
+          "url": {
+            "type": "string",
+            "description": "An absolute https URL. Never rendered as markup."
+          }
+        },
+        "required": [
+          "label",
+          "source",
+          "url"
+        ]
+      },
+      "UserPage": {
+        "type": "object",
+        "properties": {
+          "pronouns": {
+            "type": "string",
+            "nullable": true
+          },
+          "trustRank": {
+            "type": "string",
+            "nullable": true
+          },
+          "group": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentedGroup"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "active",
+              "join_me",
+              "ask_me",
+              "busy",
+              "offline"
+            ],
+            "type": "string"
+          },
+          "statusDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true,
+            "description": "Plain text with its line breaks."
+          },
+          "bannerUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Our own copy, never a VRChat address. Null until images are stored."
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "visibility": {
+            "enum": [
+              "public",
+              "unlisted",
+              "private"
+            ],
+            "type": "string"
+          },
+          "vrchatUserId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "ageVerified": {
+            "type": "boolean"
+          },
+          "links": {
+            "description": "VRChat's first, then the ones added on vrc.page, in their order.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageLink"
+            }
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verifiedAt": {
+            "type": "string",
+            "description": "When the bio code matched: ISO 8601."
+          },
+          "lastRefreshedAt": {
+            "type": "string",
+            "description": "Last successful read from VRChat: ISO 8601."
+          }
+        },
+        "required": [
+          "pronouns",
+          "trustRank",
+          "group",
+          "status",
+          "statusDescription",
+          "bio",
+          "bannerUrl",
+          "avatarUrl",
+          "visibility",
+          "vrchatUserId",
+          "displayName",
+          "ageVerified",
+          "links",
+          "languages",
+          "verifiedAt",
+          "lastRefreshedAt"
+        ]
+      },
+      "GroupOwner": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "description": "The owner's own vrc.page, only while that page is public."
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "displayName"
+        ]
+      },
+      "GroupPage": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "rules": {
+            "type": "string",
+            "nullable": true
+          },
+          "memberCount": {
+            "type": "integer"
+          },
+          "iconUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "bannerUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GroupOwner"
+              }
+            ]
+          },
+          "visibility": {
+            "enum": [
+              "public",
+              "unlisted",
+              "private"
+            ],
+            "type": "string"
+          },
+          "vrchatGroupId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string",
+            "description": "Shown with the discriminator as ABCDE.1234, the code VRChat uses."
+          },
+          "discriminator": {
+            "type": "string"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageLink"
+            }
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isVerified": {
+            "type": "boolean",
+            "description": "VRChat's own verification."
+          },
+          "verifiedAt": {
+            "type": "string",
+            "description": "When the claim succeeded: ISO 8601."
+          },
+          "lastRefreshedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "rules",
+          "memberCount",
+          "iconUrl",
+          "bannerUrl",
+          "owner",
+          "visibility",
+          "vrchatGroupId",
+          "name",
+          "shortCode",
+          "discriminator",
+          "links",
+          "languages",
+          "isVerified",
+          "verifiedAt",
+          "lastRefreshedAt"
+        ]
+      },
+      "PublicPage": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserPage"
+          },
+          "group": {
+            "$ref": "#/components/schemas/GroupPage"
+          },
+          "slug": {
+            "type": "string",
+            "description": "The page's own name, as its owner typed it."
+          },
+          "alias": {
+            "type": "boolean",
+            "description": "The name asked for is an alias: redirect (308) to `slug`."
+          }
+        },
+        "required": [
+          "kind",
+          "slug",
+          "alias"
+        ]
+      },
+      "DashboardPage": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null until a name is chosen."
+          },
+          "visibility": {
+            "enum": [
+              "public",
+              "unlisted",
+              "private"
+            ],
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "owner",
+              "editor"
+            ],
+            "type": "string"
+          },
+          "iconUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "memberCount": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Groups only."
+          },
+          "id": {
+            "type": "string",
+            "description": "vrc.page's page id, used in dashboard addresses."
+          },
+          "name": {
+            "type": "string"
+          },
+          "vrchatId": {
+            "type": "string",
+            "description": "The usr_ or grp_ id, which seeds the fallback colour."
+          }
+        },
+        "required": [
+          "kind",
+          "slug",
+          "visibility",
+          "role",
+          "iconUrl",
+          "memberCount",
+          "id",
+          "name",
+          "vrchatId"
+        ]
+      },
+      "Dashboard": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardPage"
+              }
+            ]
+          },
+          "groupClaimsLeft": {
+            "type": "integer",
+            "description": "More groups this account may still claim."
+          },
+          "pendingInvites": {
+            "type": "integer"
+          },
+          "groups": {
+            "description": "Owned groups first, then the ones this account edits.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardPage"
+            }
+          }
+        },
+        "required": [
+          "user",
+          "groupClaimsLeft",
+          "pendingInvites",
+          "groups"
+        ]
+      },
+      "OwnUserPage": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "pageId": {
+            "type": "string"
+          },
+          "page": {
+            "$ref": "#/components/schemas/UserPage"
+          }
+        },
+        "required": [
+          "slug",
+          "pageId",
+          "page"
+        ]
+      },
+      "OwnGroupPage": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "enum": [
+              "owner",
+              "editor"
+            ],
+            "type": "string"
+          },
+          "pageId": {
+            "type": "string"
+          },
+          "page": {
+            "$ref": "#/components/schemas/GroupPage"
+          }
+        },
+        "required": [
+          "slug",
+          "role",
+          "pageId",
+          "page"
+        ]
+      },
+      "NotificationPreferences": {
+        "type": "object",
+        "properties": {
+          "groupInvites": {
+            "type": "boolean",
+            "description": "Someone invited you to edit a group."
+          },
+          "pageChanges": {
+            "type": "boolean",
+            "description": "Your page's name, visibility or links changed."
+          },
+          "productNews": {
+            "type": "boolean",
+            "description": "Occasional news about vrc.page itself."
+          }
+        },
+        "required": [
+          "groupInvites",
+          "pageChanges",
+          "productNews"
+        ]
+      },
+      "SentCode": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "sign-in",
+              "change-email"
+            ]
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "DevConnectRequest": {
+        "type": "object",
+        "properties": {
+          "as": {
+            "type": "string",
+            "enum": [
+              "mira",
+              "juniper"
+            ],
+            "description": "Which test VRChat user to connect as."
+          }
+        },
+        "required": [
+          "as"
+        ]
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -116,9 +1666,13 @@
             "description": "The HTTP status code.",
             "example": 404
           },
+          "retryAfter": {
+            "type": "integer",
+            "description": "Seconds to wait before trying again, for a cooldown."
+          },
           "type": {
             "type": "string",
-            "description": "A URI naming the kind of problem; \"about:blank\" when the status says it all."
+            "description": "A URI naming the kind of problem: \"about:blank\" when the status says it\nall, otherwise https://vrc.page/problems/<code>, with a code from\nsrc/common/problem.ts."
           },
           "title": {
             "type": "string",

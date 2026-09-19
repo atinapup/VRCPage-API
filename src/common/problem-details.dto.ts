@@ -5,7 +5,11 @@ import { ApiProperty } from '@nestjs/swagger';
  * this shape and the content type application/problem+json.
  */
 export class ProblemDetails {
-  /** A URI naming the kind of problem; "about:blank" when the status says it all. */
+  /**
+   * A URI naming the kind of problem: "about:blank" when the status says it
+   * all, otherwise https://vrc.page/problems/<code>, with a code from
+   * src/common/problem.ts.
+   */
   type!: string;
   /** Short, human-readable summary of the kind of problem. */
   title!: string;
@@ -17,4 +21,6 @@ export class ProblemDetails {
   instance?: string;
   /** Same as the X-Request-Id response header and the request's audit log entries. */
   requestId!: string;
+  @ApiProperty({ type: 'integer', required: false, description: 'Seconds to wait before trying again, for a cooldown.' })
+  retryAfter?: number;
 }

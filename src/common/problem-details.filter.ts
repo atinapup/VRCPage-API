@@ -1,6 +1,7 @@
 import { STATUS_CODES } from 'node:http';
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { Problem, PROBLEM_TYPE_BASE } from './problem.js';
 import type { ProblemDetails } from './problem-details.dto.js';
 
 /** What an HttpException says, without the { statusCode, error } wrapping Nest adds. */
@@ -32,13 +33,15 @@ export class ProblemDetailsFilter implements ExceptionFilter {
 
     const detail = exception instanceof HttpException ? detailOf(exception) : undefined;
     const problem: ProblemDetails = {
-      type: 'about:blank',
+      type: exception instanceof Problem ? PROBLEM_TYPE_BASE + exception.code : 'about:blank',
       title,
       status,
       ...(detail && detail !== title ? { detail } : {}),
       instance: request.path,
       requestId: request.id,
+      ...(exception instanceof Problem && exception.retryAfter !== undefined ? { retryAfter: exception.retryAfter } : {}),
     };
+    if (problem.retryAfter !== undefined) response.setHeader('Retry-After', String(problem.retryAfter));
     response.status(status).type('application/problem+json').json(problem);
   }
 }
