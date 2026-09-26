@@ -7,6 +7,7 @@ import { DatabaseModule } from './database/database.module.js';
 import { DevModule } from './dev/dev.module.js';
 import { HealthModule } from './health/health.module.js';
 import { PagesModule } from './pages/pages.module.js';
+import { VRChatModule } from './vrchat/vrchat.module.js';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { PagesModule } from './pages/pages.module.js';
     AuthModule,
     HealthModule,
     PagesModule,
+    VRChatModule,
     // Test-data shortcuts. Never registered in production, so those routes don't exist there.
     ...(environment === 'development' ? [DevModule] : []),
   ],

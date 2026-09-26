@@ -141,6 +141,8 @@ This stops the application and accidents. The database owner and superuser can a
 
 ### What the API must do
 
+`Database.write()` in `src/database/database.ts` does this for every write, and `Audit.record()` writes the matching event; inside a write transaction the event commits or rolls back with the change. Better Auth's own writes go through its pool without an actor, so row history records only `db_role` for those.
+
 Wrap every write in a transaction that starts with:
 
 ```sql
@@ -175,6 +177,8 @@ Together these mean a development login can't even connect to the production dat
 | `vrcpage_readonly` | `DB_READONLY_USER` | SELECT on everything except secret columns |
 
 ## Better Auth mapping
+
+Better Auth runs inside the API (`src/auth`), on the `DB_AUTH_USER` login. The website has no auth code: it proxies `/api/auth/*` (the OAuth callbacks and the browser's "am I signed in" check) to the API and calls `/v1/auth/...` for everything else, so the session cookie belongs to the website's own origin. See [api.md](api.md).
 
 ```ts
 import { Pool, types } from "pg";

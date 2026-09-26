@@ -40,6 +40,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       instance: request.path,
       requestId: request.id,
       ...(exception instanceof Problem && exception.retryAfter !== undefined ? { retryAfter: exception.retryAfter } : {}),
+      ...(exception instanceof Problem && exception.itemIndex !== undefined ? { at: exception.itemIndex } : {}),
     };
     if (problem.retryAfter !== undefined) response.setHeader('Retry-After', String(problem.retryAfter));
     response.status(status).type('application/problem+json').json(problem);

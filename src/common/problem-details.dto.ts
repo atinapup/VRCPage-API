@@ -23,4 +23,6 @@ export class ProblemDetails {
   requestId!: string;
   @ApiProperty({ type: 'integer', required: false, description: 'Seconds to wait before trying again, for a cooldown.' })
   retryAfter?: number;
+  @ApiProperty({ type: 'integer', required: false, description: 'Which item of a submitted list the problem is about, counting from 0.' })
+  at?: number;
 }

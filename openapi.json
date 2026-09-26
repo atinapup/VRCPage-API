@@ -731,6 +731,919 @@
         "tags": [
           "me"
         ]
+      },
+      "patch": {
+        "operationId": "meSetNotificationPreferences",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPreferencesPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferences"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change some of the notification preferences; the answer is all of them.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/pages/{pageId}/visibility": {
+      "put": {
+        "operationId": "meSetVisibility",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisibilityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Who can open one of this account's pages. Owners only: an editor could\notherwise unpublish a community's page. A page this account doesn't run\nis the same 404 as one that isn't there.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/vrchat": {
+      "delete": {
+        "operationId": "meDisconnectVRChat",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Disconnect VRChat. The page goes, and so do the groups claimed through\nthat connection and their pages; every name is held for 90 days.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/names/{name}": {
+      "get": {
+        "operationId": "meNameAvailability",
+        "parameters": [
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameAvailability"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Whether a name can be used. Signed in, because a stranger has no business\nmapping which names exist. `pageId` names the page asking, so its own name\ncomes back as \"yours\" rather than \"taken\".",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/pages/{pageId}/name": {
+      "put": {
+        "operationId": "meSetName",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NameRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageName"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Give one of this account's pages its name, or change it. Owners only. The\nfirst name is free; after a change the name settles for slug.change_cooldown_days,\nand the one it replaced is held so nobody can pick it up to pass as its owner.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/pages/{pageId}/refresh": {
+      "post": {
+        "operationId": "meRefresh",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refreshed"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read the page again from VRChat now, rather than waiting for its turn.\nOwners only, one manual refresh per page per refresh.manual.cooldown_seconds,\nand refresh.manual.daily_cap_per_account a day.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/invitations": {
+      "get": {
+        "operationId": "editorsInvitations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Invitation"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Invitations waiting for this account's answer.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/invitations/{inviteId}/accept": {
+      "post": {
+        "operationId": "editorsAccept",
+        "parameters": [
+          {
+            "name": "inviteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Accept one, taking a seat on that group's page.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/invitations/{inviteId}/decline": {
+      "post": {
+        "operationId": "editorsDecline",
+        "parameters": [
+          {
+            "name": "inviteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Decline one. The owner can ask again later.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/groups/{pageId}/editors": {
+      "get": {
+        "operationId": "editorsList",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupEditors"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Who runs this group: seats taken, then invitations waiting. Owners only.",
+        "tags": [
+          "me"
+        ]
+      },
+      "post": {
+        "operationId": "editorsInvite",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Editor"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ask the person at a vrc.page name to help run this group. Owners only.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/groups/{pageId}/editors/{id}": {
+      "delete": {
+        "operationId": "editorsDismiss",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Take a row off that list: an invitation taken back, an editor removed, or\nan editor leaving, which anybody may do for their own seat.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/pages/{pageId}/links": {
+      "get": {
+        "operationId": "linksList",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageLinks"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "This page's own links, in order, with the limits that apply to them.",
+        "tags": [
+          "me"
+        ]
+      },
+      "put": {
+        "operationId": "linksSave",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveLinksRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageLinks"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Replace them with this ordered list: adding, editing, reordering and\nremoving are all this one save. Nothing is written unless every link in\nit is fit to store, and the refusal says which one was not.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/vrchat/claims/{kind}": {
+      "get": {
+        "operationId": "claimsPending",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "description": "user: your own VRChat account. group: a group you own.",
+            "schema": {
+              "enum": [
+                "user",
+                "group"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingClaim"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The open claim, so reloading the page picks up where it left off; 404 when there is none.",
+        "tags": [
+          "vrchat"
+        ]
+      },
+      "post": {
+        "operationId": "claimsStart",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "description": "user: your own VRChat account. group: a group you own.",
+            "schema": {
+              "enum": [
+                "user",
+                "group"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartClaimRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingClaim"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start a claim: reads the account or group once, so the answer can say\nwhich one it is, then issues the code to paste into it. Asking again for\nthe same one returns the code already issued.",
+        "tags": [
+          "vrchat"
+        ]
+      },
+      "delete": {
+        "operationId": "claimsCancel",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "description": "user: your own VRChat account. group: a group you own.",
+            "schema": {
+              "enum": [
+                "user",
+                "group"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Give up the open claim.",
+        "tags": [
+          "vrchat"
+        ]
+      }
+    },
+    "/v1/me/vrchat/claims/{kind}/check": {
+      "post": {
+        "operationId": "claimsCheck",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "description": "user: your own VRChat account. group: a group you own.",
+            "schema": {
+              "enum": [
+                "user",
+                "group"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimCheck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One press of \"Check now\": at most one read from VRChat.",
+        "tags": [
+          "vrchat"
+        ]
+      }
+    },
+    "/v1/dev/vrchat/world": {
+      "get": {
+        "operationId": "devWorld",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FakeWorldView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The stand-in VRChat: its users, its groups, and how reads answer.",
+        "tags": [
+          "dev"
+        ]
+      }
+    },
+    "/v1/dev/vrchat/users/{id}/bio": {
+      "put": {
+        "operationId": "devSetBio",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FakeTextRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Paste a code into a test bio, which is how a claim is proved while testing.",
+        "tags": [
+          "dev"
+        ]
+      }
+    },
+    "/v1/dev/vrchat/groups/{id}/description": {
+      "put": {
+        "operationId": "devSetDescription",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FakeTextRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The same for a group's description.",
+        "tags": [
+          "dev"
+        ]
+      }
+    },
+    "/v1/dev/vrchat/reads": {
+      "put": {
+        "operationId": "devSetReads",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FakeReadsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Make reads fail the way VRChat does when it pushes back.",
+        "tags": [
+          "dev"
+        ]
       }
     },
     "/v1/dev/codes": {
@@ -1172,6 +2085,11 @@
       "RepresentedGroup": {
         "type": "object",
         "properties": {
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "description": "The group's own vrc.page, only while that page is public."
+          },
           "id": {
             "type": "string"
           },
@@ -1180,6 +2098,7 @@
           }
         },
         "required": [
+          "slug",
           "id",
           "name"
         ]
@@ -1564,6 +2483,16 @@
             "type": "string",
             "nullable": true
           },
+          "nameChangeableAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When the page's name may next change: ISO 8601, or null when it can now."
+          },
+          "refreshableAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When it may next be refreshed from VRChat by hand: ISO 8601, or null when it can now."
+          },
           "pageId": {
             "type": "string"
           },
@@ -1573,6 +2502,8 @@
         },
         "required": [
           "slug",
+          "nameChangeableAt",
+          "refreshableAt",
           "pageId",
           "page"
         ]
@@ -1591,6 +2522,16 @@
             ],
             "type": "string"
           },
+          "nameChangeableAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When the page's name may next change: ISO 8601, or null when it can now."
+          },
+          "refreshableAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When it may next be refreshed from VRChat by hand: ISO 8601, or null when it can now."
+          },
           "pageId": {
             "type": "string"
           },
@@ -1601,6 +2542,8 @@
         "required": [
           "slug",
           "role",
+          "nameChangeableAt",
+          "refreshableAt",
           "pageId",
           "page"
         ]
@@ -1627,31 +2570,559 @@
           "productNews"
         ]
       },
-      "SentCode": {
+      "VisibilityRequest": {
         "type": "object",
         "properties": {
-          "purpose": {
-            "type": "string",
+          "visibility": {
             "enum": [
-              "sign-in",
-              "change-email"
+              "public",
+              "unlisted",
+              "private"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "visibility"
+        ]
+      },
+      "NotificationPreferencesPatch": {
+        "type": "object",
+        "properties": {
+          "groupInvites": {
+            "type": "boolean"
+          },
+          "pageChanges": {
+            "type": "boolean"
+          },
+          "productNews": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NameAvailability": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "available",
+              "yours",
+              "taken",
+              "held",
+              "reserved",
+              "impersonation",
+              "invalid",
+              "too_short",
+              "too_long"
+            ],
+            "type": "string",
+            "description": "available: free. yours: this page already has it. taken: another page has it. held: released recently and still held. reserved: a name the site keeps. impersonation: contains a blocked word. invalid: not letters, digits, _ or -."
+          },
+          "minLength": {
+            "type": "integer"
+          },
+          "maxLength": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "minLength",
+          "maxLength"
+        ]
+      },
+      "NameRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "PageName": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ]
+      },
+      "Refreshed": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": {
+            "type": "string",
+            "description": "ISO 8601."
+          }
+        },
+        "required": [
+          "refreshedAt"
+        ]
+      },
+      "Invitation": {
+        "type": "object",
+        "properties": {
+          "groupSlug": {
+            "type": "string",
+            "nullable": true
+          },
+          "groupIconUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "memberCount": {
+            "type": "integer",
+            "nullable": true
+          },
+          "invitedBy": {
+            "type": "string",
+            "nullable": true,
+            "description": "Who asked, by their VRChat name."
+          },
+          "id": {
+            "type": "string"
+          },
+          "groupName": {
+            "type": "string",
+            "description": "The group being invited to."
+          },
+          "sentAt": {
+            "type": "string",
+            "description": "ISO 8601."
+          }
+        },
+        "required": [
+          "groupSlug",
+          "groupIconUrl",
+          "memberCount",
+          "invitedBy",
+          "id",
+          "groupName",
+          "sentAt"
+        ]
+      },
+      "Editor": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Their VRChat name, or null if they have disconnected VRChat since."
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "description": "Their own page, if it has a name."
+          },
+          "iconUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "description": "This account, as this group's owner may refer to it. Opaque: it is only\never used to take the seat away again."
+          },
+          "since": {
+            "type": "string",
+            "description": "When they took the seat, or when they were asked: ISO 8601."
+          },
+          "pending": {
+            "type": "boolean",
+            "description": "An invitation nobody has answered yet."
+          }
+        },
+        "required": [
+          "name",
+          "slug",
+          "iconUrl",
+          "id",
+          "since",
+          "pending"
+        ]
+      },
+      "GroupEditors": {
+        "type": "object",
+        "properties": {
+          "max": {
+            "type": "integer",
+            "description": "Seats and waiting invitations together may not pass this."
+          },
+          "editors": {
+            "description": "Seats taken, then invitations still waiting.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Editor"
+            }
+          }
+        },
+        "required": [
+          "max",
+          "editors"
+        ]
+      },
+      "InviteRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Their vrc.page name, as in vrc.page/<name>."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "OwnLink": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "description": "The stored https address, normalized."
+          }
+        },
+        "required": [
+          "label",
+          "id",
+          "url"
+        ]
+      },
+      "PageLinks": {
+        "type": "object",
+        "properties": {
+          "max": {
+            "type": "integer",
+            "description": "Links one page may add, from links.custom.max_per_page."
+          },
+          "labelMax": {
+            "type": "integer",
+            "description": "Longest label, in characters."
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnLink"
+            }
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "False when adding links is turned off for everyone."
+          }
+        },
+        "required": [
+          "max",
+          "labelMax",
+          "links",
+          "enabled"
+        ]
+      },
+      "LinkInput": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "description": "What was typed. A missing scheme means https; anything else is refused."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "SaveLinksRequest": {
+        "type": "object",
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkInput"
+            }
+          }
+        },
+        "required": [
+          "links"
+        ]
+      },
+      "PendingClaim": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          },
+          "checksLeft": {
+            "type": "integer",
+            "description": "Checks left before the code is spent and a new one is needed."
+          },
+          "checkIn": {
+            "type": "integer",
+            "description": "Seconds until \"Check now\" works again; 0 when it does."
+          },
+          "targetId": {
+            "type": "string",
+            "description": "The usr_ or grp_ id being claimed."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Whose account, or which group, so nobody claims the wrong one."
+          },
+          "code": {
+            "type": "string",
+            "description": "vrcpage- and the code to paste into the bio or description."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "ISO 8601."
+          }
+        },
+        "required": [
+          "kind",
+          "checksLeft",
+          "checkIn",
+          "targetId",
+          "displayName",
+          "code",
+          "expiresAt"
+        ]
+      },
+      "StartClaimRequest": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "string",
+            "description": "vrchat.com/home/user/usr_… or vrchat.com/home/group/grp_…, or the id on its own."
+          }
+        },
+        "required": [
+          "link"
+        ]
+      },
+      "ClaimCheck": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "matched",
+              "no_match",
+              "cooldown",
+              "read_failed",
+              "refused",
+              "expired",
+              "exhausted"
+            ],
+            "type": "string",
+            "description": "matched: claimed. no_match: the code is not there yet. cooldown: too soon. read_failed: VRChat did not answer, and no check was spent. refused: the code matched but the claim is not allowed. expired or exhausted: start again."
+          },
+          "reason": {
+            "description": "Why the read failed, or why the claim was refused.",
+            "enum": [
+              "not_found",
+              "rate_limited",
+              "unavailable",
+              "already_connected",
+              "vrchat_taken",
+              "group_taken",
+              "not_connected",
+              "not_group_owner",
+              "group_private",
+              "group_limit"
+            ],
+            "type": "string"
+          },
+          "pageId": {
+            "type": "string",
+            "description": "The page that now exists, when the code matched."
+          },
+          "claim": {
+            "description": "Where the claim stands, while it is still open.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PendingClaim"
+              }
             ]
           }
         },
         "required": [
-          "purpose"
+          "status"
+        ]
+      },
+      "FakeUserView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "bio": {
+            "type": "string",
+            "description": "Where a vrcpage- code is looked for."
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "bio"
+        ]
+      },
+      "FakeGroupView": {
+        "type": "object",
+        "properties": {
+          "privacy": {
+            "enum": [
+              "default",
+              "private"
+            ],
+            "type": "string"
+          },
+          "memberCount": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "discriminator": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "description": "Where a vrcpage- code is looked for."
+          }
+        },
+        "required": [
+          "privacy",
+          "memberCount",
+          "id",
+          "name",
+          "shortCode",
+          "discriminator",
+          "ownerId",
+          "description"
+        ]
+      },
+      "FakeWorldView": {
+        "type": "object",
+        "properties": {
+          "reads": {
+            "enum": [
+              "none",
+              "rate_limited",
+              "unavailable"
+            ],
+            "type": "string",
+            "description": "How reads answer: normally, or as VRChat does when it pushes back."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FakeUserView"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FakeGroupView"
+            }
+          }
+        },
+        "required": [
+          "reads",
+          "users",
+          "groups"
+        ]
+      },
+      "FakeTextRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "FakeReadsRequest": {
+        "type": "object",
+        "properties": {
+          "reads": {
+            "enum": [
+              "none",
+              "rate_limited",
+              "unavailable"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reads"
+        ]
+      },
+      "SentCode": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "enum": [
+              "sign-in",
+              "change-email"
+            ],
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "sentAt": {
+            "type": "string",
+            "description": "ISO 8601."
+          }
+        },
+        "required": [
+          "purpose",
+          "email",
+          "code",
+          "sentAt"
         ]
       },
       "DevConnectRequest": {
         "type": "object",
         "properties": {
           "as": {
-            "type": "string",
             "enum": [
               "mira",
               "juniper"
             ],
-            "description": "Which test VRChat user to connect as."
+            "type": "string"
           }
         },
         "required": [
@@ -1669,6 +3140,10 @@
           "retryAfter": {
             "type": "integer",
             "description": "Seconds to wait before trying again, for a cooldown."
+          },
+          "at": {
+            "type": "integer",
+            "description": "Which item of a submitted list the problem is about, counting from 0."
           },
           "type": {
             "type": "string",

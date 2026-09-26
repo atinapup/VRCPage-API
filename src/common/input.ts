@@ -25,3 +25,20 @@ export function localPath(body: unknown, field: string): string {
   }
   return value;
 }
+
+/** An optional true/false. Absent stays absent; anything else is refused. */
+export function optionalFlag(body: unknown, field: string): boolean | undefined {
+  const value = body && typeof body === 'object' ? (body as Record<string, unknown>)[field] : undefined;
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') throw new BadRequestException(`${field} must be true or false.`);
+  return value;
+}
+
+/** One of a fixed set of words. */
+export function choice<T extends string>(body: unknown, field: string, allowed: readonly T[]): T {
+  const value = text(body, field, 32);
+  if (!(allowed as readonly string[]).includes(value)) {
+    throw new BadRequestException(`${field} must be one of: ${allowed.join(', ')}.`);
+  }
+  return value as T;
+}

@@ -14,6 +14,9 @@ export class PageLink {
 export class RepresentedGroup {
   id!: string;
   name!: string;
+  /** The group's own vrc.page, only while that page is public. */
+  @ApiProperty({ type: String, nullable: true })
+  slug!: string | null;
 }
 
 /** A VRChat user's page. Fields VRChat didn't give are null, never a placeholder. */
@@ -145,6 +148,12 @@ export class OwnUserPage {
   pageId!: string;
   @ApiProperty({ type: String, nullable: true })
   slug!: string | null;
+  /** When the page's name may next change: ISO 8601, or null when it can now. */
+  @ApiProperty({ type: String, nullable: true })
+  nameChangeableAt!: string | null;
+  /** When it may next be refreshed from VRChat by hand: ISO 8601, or null when it can now. */
+  @ApiProperty({ type: String, nullable: true })
+  refreshableAt!: string | null;
   page!: UserPage;
 }
 
@@ -155,7 +164,19 @@ export class OwnGroupPage {
   slug!: string | null;
   @ApiProperty({ enum: ['owner', 'editor'] })
   role!: 'owner' | 'editor';
+  /** When the page's name may next change: ISO 8601, or null when it can now. */
+  @ApiProperty({ type: String, nullable: true })
+  nameChangeableAt!: string | null;
+  /** When it may next be refreshed from VRChat by hand: ISO 8601, or null when it can now. */
+  @ApiProperty({ type: String, nullable: true })
+  refreshableAt!: string | null;
   page!: GroupPage;
+}
+
+/** What a manual refresh did. */
+export class Refreshed {
+  /** ISO 8601. */
+  refreshedAt!: string;
 }
 
 /** Which emails the account gets. No row in the database means these defaults. */
@@ -166,4 +187,45 @@ export class NotificationPreferences {
   pageChanges!: boolean;
   /** Occasional news about vrc.page itself. */
   productNews!: boolean;
+}
+
+/** Who can open a page. */
+export class VisibilityRequest {
+  @ApiProperty({ enum: ['public', 'unlisted', 'private'] })
+  visibility!: 'public' | 'unlisted' | 'private';
+}
+
+/** The preferences to change; the ones left out stay as they are. */
+export class NotificationPreferencesPatch {
+  @ApiProperty({ required: false })
+  groupInvites?: boolean;
+  @ApiProperty({ required: false })
+  pageChanges?: boolean;
+  @ApiProperty({ required: false })
+  productNews?: boolean;
+}
+
+/** Whether a name can be given to a page. */
+export class NameAvailability {
+  @ApiProperty({
+    enum: ['available', 'yours', 'taken', 'held', 'reserved', 'impersonation', 'invalid', 'too_short', 'too_long'],
+    description:
+      'available: free. yours: this page already has it. taken: another page has it. held: released recently and still held. ' +
+      'reserved: a name the site keeps. impersonation: contains a blocked word. invalid: not letters, digits, _ or -.',
+  })
+  status!: 'available' | 'yours' | 'taken' | 'held' | 'reserved' | 'impersonation' | 'invalid' | 'too_short' | 'too_long';
+  @ApiProperty({ type: 'integer' })
+  minLength!: number;
+  @ApiProperty({ type: 'integer' })
+  maxLength!: number;
+}
+
+/** The name to give a page. */
+export class NameRequest {
+  name!: string;
+}
+
+/** A page's name, as it was taken. */
+export class PageName {
+  slug!: string;
 }

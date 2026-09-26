@@ -1,28 +1,18 @@
-import { Body, ConflictException, Controller, Delete, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiProperty, ApiTags } from '@nestjs/swagger';
+import { Body, ConflictException, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import type { Transaction } from 'kysely';
 import { Audit } from '../audit/audit.js';
 import { AuthService, type Viewer } from '../auth/auth.service.js';
 import { recentCodes } from '../auth/delivery.js';
 import { CurrentViewer, SessionGuard } from '../auth/session.guard.js';
+import { choice, text } from '../common/input.js';
 import { requestContext } from '../common/request-context.js';
+import { DevConnectRequest, FakeReadsRequest, FakeTextRequest, FakeWorldView, SentCode } from './dev.dto.js';
 import { Database } from '../database/database.js';
+import { PagesService } from '../pages/pages.service.js';
 import type { DB } from '../database/database.types.js';
-import { FAKE_GROUPS, FAKE_IDS, FAKE_USERS, type FakeGroup, type FakeUser } from './fake-vrchat.js';
-
-export class SentCode {
-  email!: string;
-  code!: string;
-  @ApiProperty({ enum: ['sign-in', 'change-email'] })
-  purpose!: 'sign-in' | 'change-email';
-  sentAt!: string;
-}
-
-export class DevConnectRequest {
-  @ApiProperty({ enum: ['mira', 'juniper'], description: 'Which test VRChat user to connect as.' })
-  as!: 'mira' | 'juniper';
-}
+import { FAKE_GROUPS, FAKE_IDS, FAKE_USERS, fakeWorld, type FakeGroup, type FakeUser } from '../vrchat/fake-reader.js';
 
 /** Orin's stand-in account, which owns Night Shift and sends the invite. */
 const ORIN_EMAIL = 'orin@example.com';
@@ -103,7 +93,48 @@ export class DevController {
     private readonly db: Database,
     private readonly auth: AuthService,
     private readonly audit: Audit,
+    private readonly pages: PagesService,
   ) {}
+
+  /** The stand-in VRChat: its users, its groups, and how reads answer. */
+  @Get('vrchat/world')
+  world(): FakeWorldView {
+    return {
+      users: fakeWorld.users().map((user) => ({ id: user.id, displayName: user.displayName, bio: user.bio })),
+      groups: fakeWorld.groups().map((group) => ({
+        id: group.id,
+        name: group.name,
+        shortCode: group.shortCode,
+        discriminator: group.discriminator,
+        ownerId: group.ownerId,
+        description: group.description,
+        privacy: group.privacy,
+        memberCount: group.memberCount,
+      })),
+      reads: fakeWorld.failure(),
+    };
+  }
+
+  /** Paste a code into a test bio, which is how a claim is proved while testing. */
+  @Put('vrchat/users/:id/bio')
+  @HttpCode(204)
+  setBio(@Param('id') id: string, @Body() body: FakeTextRequest): void {
+    if (!fakeWorld.setBio(id, text(body, 'text', 4000))) throw new NotFoundException('No test user with that id.');
+  }
+
+  /** The same for a group's description. */
+  @Put('vrchat/groups/:id/description')
+  @HttpCode(204)
+  setDescription(@Param('id') id: string, @Body() body: FakeTextRequest): void {
+    if (!fakeWorld.setDescription(id, text(body, 'text', 8000))) throw new NotFoundException('No test group with that id.');
+  }
+
+  /** Make reads fail the way VRChat does when it pushes back. */
+  @Put('vrchat/reads')
+  @HttpCode(204)
+  setReads(@Body() body: FakeReadsRequest): void {
+    fakeWorld.setFailure(choice(body, 'reads', ['none', 'rate_limited', 'unavailable'] as const));
+  }
 
   /** The last few codes printed to the API's terminal, newest first. */
   @Get('codes')
@@ -214,12 +245,7 @@ export class DevController {
   @HttpCode(204)
   @UseGuards(SessionGuard)
   async disconnect(@Req() request: Request, @CurrentViewer() viewer: Viewer): Promise<void> {
-    const context = requestContext(request);
-    await this.db.write({ requestId: context.requestId, type: 'account', accountId: viewer.accountId }, async (trx) => {
-      const removed = await trx.deleteFrom('vrchat.users').where('accountId', '=', viewer.accountId).executeTakeFirst();
-      if (removed.numDeletedRows > 0n) {
-        await this.audit.record(context, { action: 'link.unlinked', actorType: 'account', actorAccountId: viewer.accountId, metadata: { dev: true }, security: true }, trx);
-      }
-    });
+    // The same path as the settings dialog's Disconnect, so this tests it too.
+    await this.pages.disconnectVRChat(requestContext(request), viewer.accountId);
   }
 }
