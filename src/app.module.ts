@@ -6,6 +6,7 @@ import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { DevModule } from './dev/dev.module.js';
 import { HealthModule } from './health/health.module.js';
+import { MailModule } from './mail/mail.module.js';
 import { PagesModule } from './pages/pages.module.js';
 import { VRChatModule } from './vrchat/vrchat.module.js';
 
@@ -14,6 +15,7 @@ import { VRChatModule } from './vrchat/vrchat.module.js';
     ConfigModule,
     DatabaseModule,
     AuditModule,
+    MailModule,
     AuthModule,
     HealthModule,
     PagesModule,

@@ -18,7 +18,7 @@ export type AuthSettings = {
 export type AuthHooks = {
   sendCode(email: string, code: string, purpose: CodePurpose): Promise<void>;
   /** Better Auth's endpoint context: its headers carry the request id, IP and user agent. */
-  accountCreated(accountId: string, context: unknown): Promise<void>;
+  accountCreated(accountId: string, email: string, context: unknown): Promise<void>;
   sessionCreated(accountId: string, sessionId: string, context: unknown): Promise<void>;
   identityCreated(accountId: string, providerId: string, context: unknown): Promise<void>;
 };
@@ -115,7 +115,7 @@ export function createAuth(config: AppConfig, pool: pg.Pool, settings: AuthSetti
     },
     rateLimit: { storage: 'database', modelName: 'rate_limits', fields: { lastRequest: 'last_request' } },
     databaseHooks: {
-      user: { create: { after: async (user, context) => hooks.accountCreated(user.id, context) } },
+      user: { create: { after: async (user, context) => hooks.accountCreated(user.id, user.email, context) } },
       session: { create: { after: async (session, context) => hooks.sessionCreated(session.userId, session.id, context) } },
       account: {
         create: { after: async (identity, context) => hooks.identityCreated(identity.userId, identity.providerId, context) },

@@ -4,6 +4,7 @@ import { Audit } from '../audit/audit.js';
 import type { RequestContext } from '../common/request-context.js';
 import { AppConfig } from '../config/app-config.js';
 import { Database } from '../database/database.js';
+import { MailService } from '../mail/mail.service.js';
 import type { DB } from '../database/database.types.js';
 import type {
   Dashboard,
@@ -39,6 +40,7 @@ export class PagesService {
     private readonly db: Database,
     private readonly config: AppConfig,
     private readonly audit: Audit,
+    private readonly mail: MailService,
   ) {}
 
   /**
@@ -512,8 +514,11 @@ export class PagesService {
     name: string,
   ): Promise<SetNameResult> {
     const settings = await this.nameSettings();
+    // Set inside the transaction, acted on after it commits: an email that
+    // fails to queue must not undo the rename it is about.
+    let first = false;
 
-    return this.db.write({ requestId: context.requestId, type: 'account', accountId }, async (trx) => {
+    const result = await this.db.write({ requestId: context.requestId, type: 'account', accountId }, async (trx) => {
       // Nobody is told anything about a page, or a name for it, before they
       // are shown to run that page.
       const role = await this.role(trx, accountId, pageId);
@@ -573,7 +578,28 @@ export class PagesService {
         { action: current ? 'slug.changed' : 'slug.claimed', actorType: 'account', actorAccountId: accountId, targetType: 'slug', targetId: pageId },
         trx,
       );
+      first = !current;
       return { status: 'ok' as const, slug };
+    });
+
+    // Only the first name is worth an email: it is the moment the page goes
+    // live. A later rename is something the person is already looking at.
+    if (result.status === 'ok' && first) await this.announceName(accountId, result.slug, settings.cooldownDays);
+    return result;
+  }
+
+  /** Tell the owner their page is live, if they still want email about their pages. */
+  private async announceName(accountId: string, slug: string, cooldownDays: number): Promise<void> {
+    const account = await this.db.selectFrom('auth.accounts').select('email').where('id', '=', accountId).executeTakeFirst();
+    if (!account) return;
+    await this.mail.enqueue({
+      to: account.email,
+      accountId,
+      template: 'name_claimed',
+      props: { slug, pageUrl: `${this.config.webOrigin}/${slug}`, cooldownDays },
+      category: 'notification',
+      preference: 'notifyPageChanges',
+      idempotencyKey: `name:${accountId}:${slug}`,
     });
   }
 }

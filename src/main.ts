@@ -11,7 +11,9 @@ import { AppConfig, loadEnvironmentFile } from './config/app-config.js';
 
 loadEnvironmentFile();
 
-const app = await NestFactory.create(AppModule);
+// rawBody: the Resend webhook is signed over the bytes as they arrived,
+// so re-serialising the parsed JSON would fail every signature.
+const app = await NestFactory.create(AppModule, { rawBody: true });
 const config = app.get(AppConfig);
 
 app.use(requestId);

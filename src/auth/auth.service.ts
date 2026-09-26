@@ -8,10 +8,10 @@ import { Problem } from '../common/problem.js';
 import type { RequestContext } from '../common/request-context.js';
 import { AppConfig } from '../config/app-config.js';
 import { Database } from '../database/database.js';
+import { MailService } from '../mail/mail.service.js';
 import { type Auth, type AuthSettings, createAuth } from './auth.js';
 import { passesBotCheck } from './bot-check.js';
 import { claimCooldown, clearCooldown, releaseCooldown } from './cooldown.js';
-import { deliverCode } from './delivery.js';
 import { issuePendingToken, readPendingToken } from './pending.js';
 
 export const SOCIAL_PROVIDERS = ['discord', 'github'] as const;
@@ -75,6 +75,7 @@ export class AuthService implements OnModuleInit, OnApplicationShutdown {
     private readonly config: AppConfig,
     private readonly db: Database,
     private readonly audit: Audit,
+    private readonly mail: MailService,
   ) {
     this.pool = new pg.Pool({
       ...config.database.auth,
@@ -96,8 +97,27 @@ export class AuthService implements OnModuleInit, OnApplicationShutdown {
     this.settings = { codeLength, codeTtlSeconds, codeMaxAttempts, resendCooldownSeconds, signupsOpen, discordEnabled, githubEnabled };
 
     this.auth = createAuth(this.config, this.pool, this.settings, {
-      sendCode: async (email, code, purpose) => deliverCode(this.config.auth.printCodes, email, code, purpose),
-      accountCreated: (accountId, context) => this.log(fromHook(context), { action: 'signup.completed', actorType: 'account', actorAccountId: accountId, security: true }),
+      sendCode: (email, code, purpose) =>
+        this.mail.send({
+          to: email,
+          accountId: null,
+          template: purpose === 'sign-in' ? 'sign_in_code' : 'email_change_code',
+          props: { code, minutes: Math.round(this.settings.codeTtlSeconds / 60) },
+          category: 'auth',
+        }),
+      accountCreated: async (accountId, email, context) => {
+        await this.log(fromHook(context), { action: 'signup.completed', actorType: 'account', actorAccountId: accountId, security: true });
+        // Queued, not sent: nobody is waiting for it, and a slow Resend must
+        // not slow down the moment an account is created.
+        await this.mail.enqueue({
+          to: email,
+          accountId,
+          template: 'welcome',
+          props: { dashboardUrl: `${this.config.webOrigin}/dashboard` },
+          category: 'transactional',
+          idempotencyKey: `welcome:${accountId}`,
+        });
+      },
       sessionCreated: (accountId, sessionId, context) =>
         this.log(fromHook(context), {
           action: 'login.success',
@@ -401,6 +421,16 @@ export class AuthService implements OnModuleInit, OnApplicationShutdown {
       throw new Problem(503, 'unavailable', UNAVAILABLE);
     }
     await this.log(context, { action: 'account.deleted', actorType: 'account', actorAccountId: viewer.accountId, security: true });
+    // After the delete, and with no account id: the row is gone, and this is
+    // the receipt for it. Only sent once the delete actually happened.
+    await this.mail.enqueue({
+      to: viewer.email,
+      accountId: null,
+      template: 'account_deleted',
+      props: { tombstoneDays: await this.db.setting<number>('slug.tombstone_days') },
+      category: 'transactional',
+      idempotencyKey: `deleted:${viewer.accountId}`,
+    });
     return headers;
   }
 }

@@ -135,6 +135,25 @@ A page shows VRChat's links first, then the ones added on vrc.page. `PUT /v1/me/
 
 Beyond the status code, `type` names the kind: `https://vrc.page/problems/<code>`, with one of the codes in `src/common/problem.ts` — `bot_check_failed`, `cooldown` (with `retryAfter`), `invalid_email`, `same_email`, `email_taken`, `signups_closed`, `pending_expired`, `wrong_code`, `code_expired`, `code_exhausted`, `provider_not_configured`, `not_connected`, `not_allowed`, `invalid_link`, `short_link`, `already_connected`, `vrchat_taken`, `vrchat_not_found`, `group_taken`, `not_group_owner`, `group_private`, `group_limit`, `no_such_page`, `invite_self`, `already_editor`, `already_invited`, `editor_limit`, `links_disabled`, `too_many_links`, `link_invalid`, `link_blocked`, `link_duplicate`, `label_too_long`, `refresh_cooldown` (with `retryAfter`), `refresh_daily_limit`, `vrchat_gone`, `group_unclaimed`, `name_unavailable`, `name_cooldown`, `session_stale`, `not_signed_in`, `unavailable`. Anything else is `about:blank`, where the status says it all. A refusal about one item of a submitted list also carries `at`, that item's position counting from 0.
 
+## Email
+
+Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands in `mail.messages`, which is the record of what was sent, what was retried, and what Resend said about it afterwards.
+
+- **Two ways in, and the difference is who is waiting.** `send()` goes out inside the request and throws if it didn't: a sign-in page must never say "code sent" while the code goes nowhere. `enqueue()` writes the message as `queued` and returns, and a drainer picks it up within fifteen seconds, so a slow Resend never slows a page down.
+- **A message is written before it is sent**, with the props it was rendered from. Codes are the exception: `sign_in_code` and `email_change_code` are stored without the code, because a stored code is as good as the mailbox. They are also never retried, for the same reason.
+- **Retries** are 1, 5, 25 and 125 minutes apart, and only for a rate limit or an outage; anything Resend refuses outright is `failed` at once. A second API process takes different rows (`FOR UPDATE SKIP LOCKED`), so nothing is sent twice.
+- **`idempotencyKey`** names a message that must only ever exist once (`welcome:<accountId>`). The row is unique on it, and Resend gets the row's id as its own idempotency key.
+- **Templates** are data, not markup (`src/mail/templates.ts`): a subject, a preheader, a heading, paragraphs, at most one button, and a note. One table layout renders all of them, with a plain-text alternative. They are sent light with a `prefers-color-scheme` dark block, which is the form that survives clients that inverts colours themselves.
+- **Preferences.** A `notification` or `product` message names the switch in Settings that turns it off (`auth.notification_preferences`), and carries a `List-Unsubscribe` header and a link to those settings. Auth and account mail has no switch.
+- **Without `RESEND_API_KEY`** nothing is sent: each message is printed to the API's terminal instead, and any code in it also shows at `GET /v1/dev/codes`. Production refuses to start in that state.
+
+`POST /v1/webhooks/resend` takes Resend's delivery events. It is not in `openapi.json`, because it is Resend calling and not the website.
+
+- The signature is checked over the raw bytes (Svix, which is the Standard Webhooks scheme), with a five-minute window, so `main.ts` asks Nest for `rawBody`. No secret, no signature, or a stale timestamp is a 401.
+- Events are stored in `mail.events`, keyed on the `svix-id` header, so a webhook delivered twice does nothing twice. A message only moves forward: a late `email.sent` never undoes a `delivered`.
+- The signature check has its own test: `node --experimental-strip-types src/mail/signature.ts`.
+- A **permanent** bounce or a spam complaint adds the address to `mail.suppressions`. Nothing is sent to a hard-bounced address again; a complaint stops notifications but still lets a sign-in code through, or the person could never get back in. A transient bounce (a full mailbox) suppresses nothing.
+
 ## Endpoints
 
 | Route | Purpose |
@@ -177,6 +196,7 @@ Beyond the status code, `type` names the kind: `https://vrc.page/problems/<code>
 | `POST /v1/me/pages/{pageId}/refresh` | Read it again from VRChat now. Owners only, with a wait between and a daily limit |
 | `GET /v1/me/names/{name}` | Whether a name can be used, with `pageId` for the page asking |
 | `PUT /v1/me/pages/{pageId}/name` | Give a page its name, or change it |
+| `POST /v1/webhooks/resend` | Resend's delivery events. Signed; not in `openapi.json` |
 | `GET /v1/dev/codes` | Development only: the codes printed to this terminal |
 | `GET /v1/dev/vrchat/world`, `PUT /v1/dev/vrchat/...` | Development only: read and edit the stand-in VRChat, including the bios and descriptions a code is pasted into |
 | `POST /v1/dev/vrchat/*`, `DELETE /v1/dev/vrchat` | Development only: connect a test VRChat user, claim its groups, invite, accept, disconnect |
@@ -194,7 +214,8 @@ src/
   database/               Database (Kysely, API login), write() with the actor, generated types
   common/                 Problem Details DTO and filter, problem codes, request id and context, input checks
   audit/                  audit.events: who did what, including refusals
-  auth/                   Better Auth, the /v1/auth endpoints, the session guard, Turnstile, code delivery
+  auth/                   Better Auth, the /v1/auth endpoints, the session guard, Turnstile
+  mail/                   templates, the outbox and its drainer, Resend, and the signed webhook
   pages/                  public pages, the signed-in account's own, and names (/v1/pages, /v1/me)
   vrchat/                 the reader seam, the stand-in records, and claim codes
   dev/                    development-only test data and shortcuts

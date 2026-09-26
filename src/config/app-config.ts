@@ -77,11 +77,30 @@ export class AppConfig {
      * one refuses every code instead of letting bots through.
      */
     turnstileSecret: process.env.TURNSTILE_SECRET_KEY || (environment === 'production' ? null : TURNSTILE_TEST_SECRET),
-    /**
-     * There is no email sender yet, so codes are printed to this terminal.
-     * Production refuses to send any unless VRCPAGE_PRINT_SIGN_IN_CODES=true,
-     * which is for testing a local production build, never a deployed one.
-     */
-    printCodes: environment !== 'production' || process.env.VRCPAGE_PRINT_SIGN_IN_CODES === 'true',
   };
+  /**
+   * Email, through Resend. With no API key nothing is sent: every message is
+   * printed to this terminal instead, which is what development wants and
+   * what the website's /dev page reads codes from.
+   */
+  readonly mail = {
+    apiKey: process.env.RESEND_API_KEY || null,
+    /** The From address. Its domain has to be verified in Resend first. */
+    from: process.env.MAIL_FROM || 'vrc.page <hello@vrc.page>',
+    /** Where replies go, if anywhere. Unset means replies bounce off the From address. */
+    replyTo: process.env.MAIL_REPLY_TO || null,
+    /** Resend's signing secret (whsec_...). Without it no webhook is believed. */
+    webhookSecret: process.env.RESEND_WEBHOOK_SECRET || null,
+  };
+
+  constructor() {
+    // A deployment with no sender can't sign anyone in, so it fails here
+    // rather than at the first person who tries. The escape hatch is for
+    // running a production build locally, never for a deployed one.
+    if (environment === 'production' && !this.mail.apiKey && process.env.VRCPAGE_PRINT_SIGN_IN_CODES !== 'true') {
+      throw new Error(
+        'RESEND_API_KEY is not set, so no email can be sent and nobody can sign in. Set it, or set VRCPAGE_PRINT_SIGN_IN_CODES=true to print codes to this terminal instead.',
+      );
+    }
+  }
 }
