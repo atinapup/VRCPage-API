@@ -28,8 +28,11 @@ const RANK: Partial<Record<MailMessageStatus, number>> = {
   sent: 2,
   delivery_delayed: 3,
   delivered: 4,
-  bounced: 5,
-  complained: 6,
+  // Bad news outranks good: these are final, and the later the worse.
+  suppressed: 5,
+  failed: 6,
+  bounced: 7,
+  complained: 8,
 };
 
 const STATUS: Record<string, MailMessageStatus> = {
@@ -38,6 +41,11 @@ const STATUS: Record<string, MailMessageStatus> = {
   'email.delivery_delayed': 'delivery_delayed',
   'email.bounced': 'bounced',
   'email.complained': 'complained',
+  // It never went: Resend could not send it, or blocked it against their own
+  // suppression list. Without these a message nobody received would sit at
+  // `sent` for ever, which is the one thing this table must not say.
+  'email.failed': 'failed',
+  'email.suppressed': 'suppressed',
 };
 
 /** The when-it-happened column that goes with each status. */
@@ -51,7 +59,12 @@ const STAMP: Partial<Record<MailMessageStatus, 'sentAt' | 'deliveredAt' | 'bounc
 type Event = {
   type?: unknown;
   created_at?: unknown;
-  data?: { email_id?: unknown; to?: unknown; bounce?: { type?: unknown } | null } | null;
+  data?: {
+    email_id?: unknown;
+    to?: unknown;
+    bounce?: { type?: unknown; message?: unknown } | null;
+    failed?: { reason?: unknown } | null;
+  } | null;
 };
 
 @Controller('webhooks')
@@ -114,9 +127,10 @@ export class MailController {
 
       if (message && status && (RANK[status] ?? 0) > (RANK[message.status] ?? 0)) {
         const stamp = STAMP[status];
+        const why = reasonFor(event);
         await trx
           .updateTable('mail.messages')
-          .set({ status, ...(stamp ? { [stamp]: occurredAt } : {}) })
+          .set({ status, ...(stamp ? { [stamp]: occurredAt } : {}), ...(why ? { lastError: why } : {}) })
           .where('id', '=', message.id)
           .execute();
       }
@@ -143,6 +157,12 @@ function suppressionFor(type: string, event: Event): MailSuppressionReason | nul
   // address is still real, so it is not suppressed.
   if (type === 'email.bounced' && String(event.data?.bounce?.type ?? '').toLowerCase() === 'permanent') return 'hard_bounce';
   return null;
+}
+
+/** What Resend said went wrong, for the row, when it said anything. */
+function reasonFor(event: Event): string | null {
+  const reason = event.data?.failed?.reason ?? event.data?.bounce?.message;
+  return typeof reason === 'string' && reason !== '' ? reason.slice(0, 2000) : null;
 }
 
 function firstRecipient(event: Event): string | null {
