@@ -113,5 +113,11 @@ export class AppConfig {
         'RESEND_API_KEY is not set, so no email can be sent and nobody can sign in. Set it, or set VRCPAGE_PRINT_SIGN_IN_CODES=true to print codes to this terminal instead.',
       );
     }
+    // The bot check fails closed, so a deployment without it refuses every
+    // sign-in code. That is the same "nobody can sign in" as above, and it
+    // would otherwise only show up when the first person tried.
+    if (environment === 'production' && !this.auth.turnstileSecret) {
+      throw new Error('TURNSTILE_SECRET_KEY is not set. The bot check fails closed, so every sign-in code would be refused.');
+    }
   }
 }

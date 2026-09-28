@@ -177,6 +177,19 @@ Nothing reads VRChat on a page view, ever. Reads come from three places only:
 
 **The session.** `VRCHAT_AUTH_COOKIE` holds VRChat's `auth` cookie for the service account. vrc.page never holds a VRChat password, and there is no sign-in flow here to type one into. Without the cookie, development reads the test records in `src/vrchat/fake-reader.ts` and anything else says it cannot read.
 
+## What production refuses to start without
+
+`AppConfig` checks these at start-up rather than letting the first visitor find them. Each one is the difference between a working site and one that looks fine until somebody tries to sign in:
+
+| Variable | Why it is fatal |
+|---|---|
+| `WEB_ORIGIN`, `DB_HOST`, `DB_NAME`, `DB_API_*`, `DB_AUTH_*` | Nothing runs without them |
+| `BETTER_AUTH_SECRET` | Sessions, OAuth state and pending sign-in tokens are signed with it |
+| `RESEND_API_KEY` | No email means no sign-in codes. `VRCPAGE_PRINT_SIGN_IN_CODES=true` is the escape hatch for a local production build |
+| `TURNSTILE_SECRET_KEY` | The bot check fails closed, so every code would be refused |
+
+Missing `VRCHAT_AUTH_COOKIE` and `IMAGES_BASE_URL` are warnings, not failures: pages still serve from the database, they just stop being refreshed and fall back to their own art.
+
 ## Email
 
 Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands in `mail.messages`, which is the record of what was sent, what was retried, and what Resend said about it afterwards.
@@ -190,6 +203,8 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 - **Without `RESEND_API_KEY`** nothing is sent: each message is printed to the API's terminal instead, and any code in it also shows at `GET /v1/dev/codes`. Production refuses to start in that state.
 
 `POST /v1/webhooks/resend` takes Resend's delivery events. It is not in `openapi.json`, because it is Resend calling and not the website.
+
+**The address to register in Resend is the website's**, `https://vrc.page/api/webhooks/resend`, which forwards the bytes here. The API is not on the internet and should not be: it trusts the `X-Forwarded-For` the website sets, so anything able to reach it directly could claim any address and walk past Better Auth's rate limits and the IP on every security audit row. This webhook is the only thing inbound that is not a browser, so it comes the same way as everything else. Discord and GitHub need nothing: their callbacks redirect the browser to the website, which proxies the GET here.
 
 - The signature is checked over the raw bytes (Svix, which is the Standard Webhooks scheme), with a five-minute window, so `main.ts` asks Nest for `rawBody`. No secret, no signature, or a stale timestamp is a 401.
 - Events are stored in `mail.events`, keyed on the `svix-id` header, so a webhook delivered twice does nothing twice. A message only moves forward: a late `email.sent` never undoes a `delivered`.
