@@ -38,13 +38,14 @@ export class ClaimCheck {
     enum: ['matched', 'no_match', 'cooldown', 'read_failed', 'refused', 'expired', 'exhausted'],
     description:
       'matched: claimed. no_match: the code is not there yet. cooldown: too soon. ' +
-      'read_failed: VRChat did not answer, and no check was spent. refused: the code matched but the claim is not allowed. ' +
+      'read_failed: nothing came back, and no check was spent (reason busy means vrc.page has not got a turn to ask yet). ' +
+      'refused: the code matched but the claim is not allowed. ' +
       'expired or exhausted: start again.',
   })
   status!: 'matched' | 'no_match' | 'cooldown' | 'read_failed' | 'refused' | 'expired' | 'exhausted';
   /** Why the read failed, or why the claim was refused. */
-  @ApiProperty({ required: false, enum: ['not_found', 'rate_limited', 'unavailable', ...REFUSALS] })
-  reason?: 'not_found' | 'rate_limited' | 'unavailable' | (typeof REFUSALS)[number];
+  @ApiProperty({ required: false, enum: ['not_found', 'rate_limited', 'unavailable', 'busy', ...REFUSALS] })
+  reason?: 'not_found' | 'rate_limited' | 'unavailable' | 'busy' | (typeof REFUSALS)[number];
   /** The page that now exists, when the code matched. */
   @ApiProperty({ type: String, required: false })
   pageId?: string;

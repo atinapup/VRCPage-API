@@ -2929,7 +2929,7 @@
               "exhausted"
             ],
             "type": "string",
-            "description": "matched: claimed. no_match: the code is not there yet. cooldown: too soon. read_failed: VRChat did not answer, and no check was spent. refused: the code matched but the claim is not allowed. expired or exhausted: start again."
+            "description": "matched: claimed. no_match: the code is not there yet. cooldown: too soon. read_failed: nothing came back, and no check was spent (reason busy means vrc.page has not got a turn to ask yet). refused: the code matched but the claim is not allowed. expired or exhausted: start again."
           },
           "reason": {
             "description": "Why the read failed, or why the claim was refused.",
@@ -2937,6 +2937,7 @@
               "not_found",
               "rate_limited",
               "unavailable",
+              "busy",
               "already_connected",
               "vrchat_taken",
               "group_taken",

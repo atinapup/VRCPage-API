@@ -183,6 +183,10 @@ export class MeController {
         throw new Problem(403, 'not_allowed', 'Only the owner can refresh this page.');
       case 'cooldown':
         throw new Problem(429, 'refresh_cooldown', 'This page was refreshed a moment ago.', result.wait);
+      case 'busy':
+        // Not this page's fault: vrc.page reads VRChat once a minute for
+        // everyone, and another read has the turn.
+        throw new Problem(429, 'refresh_cooldown', 'vrc.page reads VRChat once a minute, and another read has the turn.', result.wait);
       case 'daily_limit':
         throw new Problem(429, 'refresh_daily_limit', `You can refresh pages ${result.cap} times a day.`);
       case 'gone':

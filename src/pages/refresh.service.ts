@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Audit } from '../audit/audit.js';
 import type { RequestContext } from '../common/request-context.js';
-import { environment } from '../config/app-config.js';
 import { Database } from '../database/database.js';
-import { fakeReader } from '../vrchat/fake-reader.js';
+import { VRChatReader } from '../vrchat/reader.js';
 import { PagesService } from './pages.service.js';
 
 /*
@@ -22,9 +21,10 @@ import { PagesService } from './pages.service.js';
  * refresh that finds either has changed acts on it: a group handed to someone
  * else is unclaimed, and one made private is made private here too.
  *
- * Until the rate-limited VRChat client exists, development reads the test
- * records and runs the job on the spot. Production has nothing to read with
- * yet, and says so rather than queueing work nothing will do.
+ * The read itself goes through VRChatReader, from the manual lane. It never
+ * waits: VRChat is read at most once a minute site-wide, so a press that
+ * arrives while another read holds the slot is told how long, rather than
+ * holding someone's request open for a minute.
  */
 
 export type RefreshResult =
@@ -37,6 +37,8 @@ export type RefreshResult =
   | { status: 'gone' }
   /** The group has another owner now, so its page went. */
   | { status: 'unclaimed' }
+  /** Nothing was asked of VRChat: the slot is taken, or the lane is spent for today. */
+  | { status: 'busy'; wait: number }
   | { status: 'unavailable' };
 
 /** Postgres' answer when a unique index refuses a row. */
@@ -48,6 +50,7 @@ export class RefreshService {
     private readonly db: Database,
     private readonly audit: Audit,
     private readonly pages: PagesService,
+    private readonly reader: VRChatReader,
   ) {}
 
   private async settings() {
@@ -64,7 +67,6 @@ export class RefreshService {
     const role = await this.pages.role(this.db, accountId, pageId);
     if (!role) return { status: 'not_found' };
     if (role !== 'owner' && settings.ownerOnly) return { status: 'not_allowed' };
-    if (environment !== 'development') return { status: 'unavailable' };
 
     const waitUntil = await this.pages.refreshableAt(pageId);
     if (waitUntil) return { status: 'cooldown', wait: Math.max(1, Math.ceil((Date.parse(waitUntil) - Date.now()) / 1000)) };
@@ -115,11 +117,14 @@ export class RefreshService {
       this.db.updateTable('vrchat.jobs').set({ status, finishedAt: new Date(), error }).where('id', '=', jobId).execute();
 
     // One read, kept by kind so each branch below has its own shape.
-    const userRead = page.kind === 'user' ? fakeReader.getUser(page.vrchatUserId!) : null;
-    const groupRead = page.kind === 'group' ? fakeReader.getGroup(page.vrchatGroupId!) : null;
+    const userRead = page.kind === 'user' ? await this.reader.getUser('manual', page.vrchatUserId!, jobId) : null;
+    const groupRead = page.kind === 'group' ? await this.reader.getGroup('manual', page.vrchatGroupId!, jobId) : null;
     const read = (userRead ?? groupRead)!;
     if (!read.ok) {
       await finish('failed', read.reason);
+      // Nothing was asked, so nothing was learned and nothing was spent: the
+      // job is closed and the press can be made again once the slot frees.
+      if (read.reason === 'busy') return { status: 'busy', wait: read.waitSeconds ?? 60 };
       if (read.reason !== 'not_found') return { status: 'unavailable' };
       await this.db.write(actor, async (trx) => {
         const set = { lastFetchError: 'not_found' as const, lastFetchErrorAt: new Date() };
@@ -141,6 +146,7 @@ export class RefreshService {
             bioLinks: value.bioLinks,
             pronouns: value.pronouns,
             status: value.status,
+            statusDescription: value.statusDescription,
             isAgeVerified: value.isAgeVerified,
             trustRank: value.trustRank,
             representedGroupId: value.representedGroup?.id ?? null,

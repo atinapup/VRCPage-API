@@ -135,6 +135,48 @@ A page shows VRChat's links first, then the ones added on vrc.page. `PUT /v1/me/
 
 Beyond the status code, `type` names the kind: `https://vrc.page/problems/<code>`, with one of the codes in `src/common/problem.ts` — `bot_check_failed`, `cooldown` (with `retryAfter`), `invalid_email`, `same_email`, `email_taken`, `signups_closed`, `pending_expired`, `wrong_code`, `code_expired`, `code_exhausted`, `provider_not_configured`, `not_connected`, `not_allowed`, `invalid_link`, `short_link`, `already_connected`, `vrchat_taken`, `vrchat_not_found`, `group_taken`, `not_group_owner`, `group_private`, `group_limit`, `no_such_page`, `invite_self`, `already_editor`, `already_invited`, `editor_limit`, `links_disabled`, `too_many_links`, `link_invalid`, `link_blocked`, `link_duplicate`, `label_too_long`, `refresh_cooldown` (with `retryAfter`), `refresh_daily_limit`, `vrchat_gone`, `group_unclaimed`, `name_unavailable`, `name_cooldown`, `session_stale`, `not_signed_in`, `unavailable`. Anything else is `about:blank`, where the status says it all. A refusal about one item of a submitted list also carries `at`, that item's position counting from 0.
 
+## Reading VRChat
+
+VRChat has no public API, asks that nobody query it more than once a minute, and can terminate an account it thinks is abusing it. One flagged service account stops the whole product, so `src/vrchat/client.ts` is built to be careful before it is built to be quick. It is the only code in the API that makes an outbound call to VRChat, and nothing in the browser ever does.
+
+**Taking a turn.** Every read locks the single `vrchat.client_state` row, checks five things, and pushes `next_call_at` forward *before* the call goes out. Only one turn exists per `vrchat.api.min_interval_seconds`, so two reads can never be in flight, across every request and every API process. The five:
+
+1. `vrchat.api.enabled`, the kill switch. Changing it takes effect on the next read, with no restart.
+2. The circuit breaker: `circuit_opened_at`, set after `vrchat.api.circuit_breaker_threshold` refused sessions in a row.
+3. The rate-limit backoff: `backoff_until`, set by a 429.
+4. The minimum spacing: `next_call_at`.
+5. The lane's share of the day, from `vrchat.budget_today`. A lane that has spent its share waits until midnight UTC; it never borrows from another.
+
+**Nothing waits.** A read that cannot have the turn returns `busy` with the number of seconds until one is free. Holding a request open for a minute would only move the queue into somebody's browser, so the wait is given to the client to show.
+
+**A 429 stops every lane**, not just the one that caused it, because the limit is on the account. The wait doubles from `backoff_initial_seconds` to `backoff_max_seconds` with a fifth either way of jitter, and VRChat's own `Retry-After` wins when it asks for longer. `src/vrchat/budget.ts` holds that sum and its test: `node --experimental-strip-types src/vrchat/budget.ts`.
+
+**A refused session pauses everything.** Three 401s in a row open the circuit and log what to do. Pages keep serving from the database; only claims and refreshes stop. A restart closes the circuit, because a restart is how a new cookie arrives.
+
+**Every call is logged** to `vrchat.api_calls` with its lane, endpoint, status, outcome, duration and job, and that table is also what the daily budget counts.
+
+### Which endpoints, and why
+
+| Read | Endpoint |
+|---|---|
+| A person | `GET /profile/{userId}` |
+| A group | `GET /groups/{groupId}` |
+
+`GET /profile/{userId}`, not `GET /users/{userId}`: VRChat moved the bio onto the profile, and the bio is where a `vrcpage-` code is pasted. The profile also carries the represented group and the languages as plain arrays, so one call does what would otherwise take two. The cost is `trustRank`, which only the user endpoint still has; a second call per person for one label is not a good use of 1440 calls a day, so that column stays empty and the profile card leaves it out.
+
+18+ comes from `ageVerificationStatus`, not from `ageVerified`: someone who verified and set it to hidden is not shown as 18+ here either.
+
+`src/vrchat/api.ts` maps both answers and is where VRChat's shape is pinned down. Every field is treated as missing until proved otherwise, and anything too long for its column is cut rather than refused, so one changed field never throws away a whole snapshot. Its test is `node --experimental-strip-types src/vrchat/api.ts`. A group missing `ownerId` or `privacy` is unreadable rather than guessed at, because guessing `default` would publish a group somebody made private.
+
+### What spends a call
+
+Nothing reads VRChat on a page view, ever. Reads come from three places only:
+
+- **Issuing a claim code** and **one press of "Check now"**, from the verification lane. Both cost a read, so both wait `claim.code.check_cooldown_seconds` after the account's last one; without that, giving up a claim and starting another in a loop would spend the whole lane for everybody. Asking again for the claim already open reads nothing and hands back the same code, and neither does reopening one: the name is kept on `vrchat.claim_codes.display_name` from the read that issued it.
+- **A manual refresh**, from the manual lane, behind a per-page cooldown and a per-account daily cap.
+
+**The session.** `VRCHAT_AUTH_COOKIE` holds VRChat's `auth` cookie for the service account. vrc.page never holds a VRChat password, and there is no sign-in flow here to type one into. Without the cookie, development reads the test records in `src/vrchat/fake-reader.ts` and anything else says it cannot read.
+
 ## Email
 
 Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands in `mail.messages`, which is the record of what was sent, what was retried, and what Resend said about it afterwards.

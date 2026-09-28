@@ -5,8 +5,8 @@ import { Audit } from '../audit/audit.js';
 import type { RequestContext } from '../common/request-context.js';
 import { Database } from '../database/database.js';
 import type { DB } from '../database/database.types.js';
-import { environment } from '../config/app-config.js';
-import { fakeReader, type FakeGroup, type FakeUser, type ReadResult } from './fake-reader.js';
+import { VRChatReader } from './reader.js';
+import type { ReadFailure, ReadResult, VRChatGroup, VRChatUser } from './types.js';
 
 /*
  * Proving someone controls a VRChat account or group, Section 4.
@@ -26,9 +26,9 @@ import { fakeReader, type FakeGroup, type FakeUser, type ReadResult } from './fa
  * private, both when the code is issued and again when it matches: a group
  * handed over or hidden in between never becomes somebody else's page.
  *
- * Until the rate-limited VRChat client exists, development reads the test
- * records in fake-reader.ts. Production has nothing to read with yet, and
- * says so rather than pretending.
+ * Reads go through VRChatReader, which spends them from the verification
+ * lane. Only two things here read at all: issuing a code, and one press of
+ * "Check now". Reopening a claim shows the name kept from the first read.
  */
 
 export type ClaimKind = 'user' | 'group';
@@ -72,13 +72,15 @@ export type StartResult =
   | { status: 'ok'; claim: PendingClaim }
   | { status: 'refused'; reason: Refusal }
   | { status: 'not_found' }
-  | { status: 'read_failed'; reason: 'rate_limited' | 'unavailable' };
+  /** Too soon after this account's last read of VRChat. */
+  | { status: 'cooldown'; wait: number }
+  | { status: 'read_failed'; reason: ReadFailure; waitSeconds?: number };
 
 export type CheckResult =
   | { status: 'matched'; pageId: string }
   | { status: 'no_match'; claim: PendingClaim }
   | { status: 'cooldown'; claim: PendingClaim }
-  | { status: 'read_failed'; reason: 'not_found' | 'rate_limited' | 'unavailable'; claim: PendingClaim }
+  | { status: 'read_failed'; reason: ReadFailure; waitSeconds?: number; claim: PendingClaim }
   /** The code matched, but the claim still isn't allowed. */
   | { status: 'refused'; reason: Refusal }
   | { status: 'expired' }
@@ -92,8 +94,8 @@ type Target = {
   name: string;
   /** Where the code is looked for: the bio, or the description. */
   text: string;
-  user?: FakeUser;
-  group?: FakeGroup;
+  user?: VRChatUser;
+  group?: VRChatGroup;
 };
 
 /** The trail reads differently for the two kinds, so each has its own names. */
@@ -123,6 +125,7 @@ export class ClaimsService {
   constructor(
     private readonly db: Database,
     private readonly audit: Audit,
+    private readonly reader: VRChatReader,
   ) {}
 
   private async settings(): Promise<ClaimSettings> {
@@ -143,16 +146,21 @@ export class ClaimsService {
     return `vrcpage-${out}`;
   }
 
-  /** One read from VRChat. Development reads the test records. */
-  private read(kind: ClaimKind, id: string): ReadResult<Target> {
-    if (environment !== 'development') return { ok: false, reason: 'unavailable' };
+  /**
+   * One read from VRChat, spent from the verification lane.
+   *
+   * Only ever called where a read is the point: issuing a code, and one press
+   * of "Check now". Showing a claim that already exists reads nothing, because
+   * a name on a screen is not worth a call from a budget of 1440 a day.
+   */
+  private async read(kind: ClaimKind, id: string): Promise<ReadResult<Target>> {
     if (kind === 'user') {
-      const result = fakeReader.getUser(id);
+      const result = await this.reader.getUser('verification', id);
       return result.ok
         ? { ok: true, value: { id: result.value.id, name: result.value.displayName, text: result.value.bio, user: result.value } }
         : result;
     }
-    const result = fakeReader.getGroup(id);
+    const result = await this.reader.getGroup('verification', id);
     return result.ok ? { ok: true, value: { id: result.value.id, name: result.value.name, text: result.value.description, group: result.value } } : result;
   }
 
@@ -219,11 +227,28 @@ export class ClaimsService {
   private openClaim(accountId: string, kind: ClaimKind) {
     return this.db
       .selectFrom('vrchat.claimCodes')
-      .select(['id', 'targetKind', 'vrchatUserId', 'vrchatGroupId', 'code', 'expiresAt', 'checkCount', 'lastCheckedAt'])
+      .select(['id', 'targetKind', 'vrchatUserId', 'vrchatGroupId', 'code', 'expiresAt', 'checkCount', 'lastCheckedAt', 'displayName'])
       .where('accountId', '=', accountId)
       .where('targetKind', '=', kind)
       .where('status', '=', 'pending')
       .executeTakeFirst();
+  }
+
+  /**
+   * Seconds this account must still wait before it may cost another read.
+   *
+   * Issuing a code and pressing "Check now" both read VRChat, so both are
+   * counted here: whichever happened last starts the wait.
+   */
+  private async sinceLastRead(accountId: string, kind: ClaimKind, settings: ClaimSettings): Promise<number> {
+    const row = await this.db
+      .selectFrom('vrchat.claimCodes')
+      .select((eb) => eb.fn.max(eb.fn('greatest', ['createdAt', eb.fn.coalesce('lastCheckedAt', 'createdAt')])).as('last'))
+      .where('accountId', '=', accountId)
+      .where('targetKind', '=', kind)
+      .executeTakeFirst();
+    const last = row?.last ? new Date(row.last as unknown as string).getTime() : 0;
+    return Math.max(0, Math.ceil((last + settings.checkCooldownSeconds * 1000 - Date.now()) / 1000));
   }
 
   /** The account's open claim of this kind, or null when there is none or it has run out. */
@@ -234,8 +259,7 @@ export class ClaimsService {
     if (row.expiresAt.getTime() <= Date.now() || row.checkCount >= settings.maxChecks) return null;
 
     const targetId = (kind === 'user' ? row.vrchatUserId : row.vrchatGroupId)!;
-    const read = this.read(kind, targetId);
-    return this.view(row, read.ok ? read.value.name : targetId, settings);
+    return this.view(row, row.displayName ?? targetId, settings);
   }
 
   /**
@@ -253,8 +277,19 @@ export class ClaimsService {
     if (kind === 'user' && connected) return { status: 'refused', reason: 'already_connected' };
     if (kind === 'group' && !connected) return { status: 'refused', reason: 'not_connected' };
 
-    const read = this.read(kind, targetId);
-    if (!read.ok) return read.reason === 'not_found' ? { status: 'not_found' } : { status: 'read_failed', reason: read.reason };
+    // Asking again for the claim already open reads nothing: the answer is
+    // the code that is already pasted into VRChat somewhere.
+    const open = await this.pending(accountId, kind);
+    if (open && open.targetId === targetId) return { status: 'ok', claim: open };
+
+    // Issuing a code costs a read, exactly like a check does, so it waits the
+    // same 60 seconds. Without this, giving up a claim and starting another
+    // in a loop would spend the whole verification lane for everybody.
+    const wait = await this.sinceLastRead(accountId, kind, settings);
+    if (wait > 0) return { status: 'cooldown', wait };
+
+    const read = await this.read(kind, targetId);
+    if (!read.ok) return read.reason === 'not_found' ? { status: 'not_found' } : { status: 'read_failed', reason: read.reason, waitSeconds: read.waitSeconds };
     const target = read.value;
 
     const refusal = await this.refusal(this.db, accountId, kind, target);
@@ -272,9 +307,6 @@ export class ClaimsService {
       }
       return { status: 'refused', reason: refusal };
     }
-
-    const existing = await this.pending(accountId, kind);
-    if (existing && existing.targetId === target.id) return { status: 'ok', claim: existing };
 
     const claim = await this.db.write({ requestId: context.requestId, type: 'account', accountId }, async (trx) => {
       // Only one code of a kind may be open per account, so a code for
@@ -296,8 +328,10 @@ export class ClaimsService {
           vrchatGroupId: kind === 'group' ? target.id : null,
           code: this.code(settings),
           expiresAt: new Date(Date.now() + settings.ttlSeconds * 1000),
+          // Kept from this one read, so reopening the claim costs nothing.
+          displayName: target.name.slice(0, 200) || null,
         })
-        .returning(['id', 'targetKind', 'vrchatUserId', 'vrchatGroupId', 'code', 'expiresAt', 'checkCount', 'lastCheckedAt'])
+        .returning(['id', 'targetKind', 'vrchatUserId', 'vrchatGroupId', 'code', 'expiresAt', 'checkCount', 'lastCheckedAt', 'displayName'])
         .executeTakeFirstOrThrow();
 
       await this.audit.record(
@@ -368,15 +402,15 @@ export class ClaimsService {
     }
     const waited = row.lastCheckedAt ? (Date.now() - row.lastCheckedAt.getTime()) / 1000 : Infinity;
     if (waited < settings.checkCooldownSeconds) {
-      const read = this.read(kind, targetId);
-      return { status: 'cooldown', claim: this.view(row, read.ok ? read.value.name : targetId, settings) };
+      // Too soon is not a reason to ask VRChat anything.
+      return { status: 'cooldown', claim: this.view(row, row.displayName ?? targetId, settings) };
     }
 
     // The cooldown starts now, before the read.
     await this.db.write(actor, async (trx) => {
       await trx.updateTable('vrchat.claimCodes').set({ lastCheckedAt: new Date() }).where('id', '=', row.id).execute();
     });
-    const read = this.read(kind, targetId);
+    const read = await this.read(kind, targetId);
     const checked = { ...row, lastCheckedAt: new Date() };
 
     if (!read.ok) {
@@ -389,7 +423,7 @@ export class ClaimsService {
         targetId,
         metadata: { reason: read.reason },
       });
-      return { status: 'read_failed', reason: read.reason, claim: this.view(checked, targetId, settings) };
+      return { status: 'read_failed', reason: read.reason, waitSeconds: read.waitSeconds, claim: this.view(checked, targetId, settings) };
     }
 
     const target = read.value;

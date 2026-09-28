@@ -522,6 +522,10 @@ export interface VrchatClaimCodes {
    * Why a matching code was still refused, e.g. already_connected, not_group_owner, group_private, banned.
    */
   deniedReason: string | null;
+  /**
+   * The VRChat display name or group name, as it read when the code was issued. Saves a call when the claim is reopened.
+   */
+  displayName: string | null;
   expiresAt: Timestamp;
   id: Generated<string>;
   lastCheckedAt: Timestamp | null;

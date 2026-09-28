@@ -93,6 +93,17 @@ export class AppConfig {
     webhookSecret: process.env.RESEND_WEBHOOK_SECRET || null,
   };
 
+  /**
+   * VRChat. The client carries a session cookie the operator got themselves;
+   * vrc.page never holds anyone's VRChat password. Without one, nothing is
+   * read from VRChat: pages still serve from the database, and claims and
+   * refreshes say they can't rather than pretending.
+   */
+  readonly vrchat = {
+    /** The value of VRChat's `auth` cookie. It lasts weeks, not for ever. */
+    authCookie: process.env.VRCHAT_AUTH_COOKIE || null,
+  };
+
   constructor() {
     // A deployment with no sender can't sign anyone in, so it fails here
     // rather than at the first person who tries. The escape hatch is for

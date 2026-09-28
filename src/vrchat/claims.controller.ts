@@ -93,6 +93,8 @@ export class ClaimsController {
         throw this.problemFor(kind, result.reason);
       case 'not_found':
         throw new Problem(404, 'vrchat_not_found', kind === 'user' ? 'VRChat has no account with that id.' : 'VRChat has no group with that id.');
+      case 'cooldown':
+        throw new Problem(429, 'cooldown', 'vrc.page reads VRChat once a minute. Try again in a moment.', result.wait);
       default:
         throw new Problem(503, 'unavailable', 'VRChat could not be reached. Try again in a minute.');
     }

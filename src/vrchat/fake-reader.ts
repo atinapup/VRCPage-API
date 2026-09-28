@@ -13,33 +13,15 @@
  *            from connecting an account to adding a group can be made again.
  */
 
-export type FakeUser = {
-  id: string;
-  displayName: string;
-  bio: string;
-  bioLinks: string[];
-  pronouns: string | null;
-  status: 'active' | 'join_me' | 'ask_me' | 'busy' | 'offline';
-  isAgeVerified: boolean;
-  trustRank: string | null;
-  representedGroup: { id: string; name: string } | null;
-  languages: string[];
-};
+import type { ReadResult, VRChatGroup, VRChatUser } from './types.js';
 
-export type FakeGroup = {
-  id: string;
-  name: string;
-  shortCode: string;
-  discriminator: string;
-  ownerId: string;
-  description: string;
-  rules: string | null;
-  links: string[];
-  languages: string[];
-  memberCount: number;
-  isVerified: boolean;
-  privacy: 'default' | 'private';
-};
+/*
+ * The test records answer in exactly the shape the real client does, so
+ * nothing downstream can tell them apart, and a field added to one has to be
+ * added to the other.
+ */
+export type FakeUser = VRChatUser;
+export type FakeGroup = VRChatGroup;
 
 export const FAKE_IDS = {
   mira: 'usr_4e8b2d17-9c3a-4f61-b5d0-7a2e1c9f8b34',
@@ -60,10 +42,13 @@ const user = (fields: Pick<FakeUser, 'id' | 'displayName'> & Partial<FakeUser>):
   bioLinks: [],
   pronouns: null,
   status: 'offline',
+  statusDescription: null,
   isAgeVerified: false,
   trustRank: null,
   representedGroup: null,
   languages: [],
+  iconUrl: null,
+  bannerUrl: null,
   ...fields,
 });
 
@@ -75,6 +60,8 @@ const group = (fields: Pick<FakeGroup, 'id' | 'name' | 'shortCode' | 'discrimina
   memberCount: 0,
   isVerified: false,
   privacy: 'default',
+  iconUrl: null,
+  bannerUrl: null,
   ...fields,
 });
 
@@ -189,15 +176,11 @@ export const FAKE_GROUPS: FakeGroup[] = [
   }),
 ];
 
-/** What a read answers with when it can't. */
-export type ReadFailure = 'not_found' | 'rate_limited' | 'unavailable';
-export type ReadResult<T> = { ok: true; value: T } | { ok: false; reason: ReadFailure };
-
 type World = {
   users: Map<string, FakeUser>;
   groups: Map<string, FakeGroup>;
   /** How reads answer: normally, or as VRChat does when it pushes back. */
-  failure: 'none' | Exclude<ReadFailure, 'not_found'>;
+  failure: 'none' | 'rate_limited' | 'unavailable';
 };
 
 const world: World = {
