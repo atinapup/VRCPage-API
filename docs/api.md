@@ -177,6 +177,16 @@ Nothing reads VRChat on a page view, ever. Reads come from three places only:
 
 **The session.** `VRCHAT_AUTH_COOKIE` holds VRChat's `auth` cookie for the service account. vrc.page never holds a VRChat password, and there is no sign-in flow here to type one into. Without the cookie, development reads the test records in `src/vrchat/fake-reader.ts` and anything else says it cannot read.
 
+## Two database logins, and why readiness checks both
+
+The API signs in to Postgres twice: `DB_API_*` for everything the site renders, and `DB_AUTH_*` for Better Auth, on its own pool. Only the second can sign anybody in.
+
+That means a wrong `DB_AUTH_PASSWORD` is invisible from the outside. Every page renders, `/v1/pages/{slug}` answers, the sign-in page even lists its providers — and then every sign-in fails with `password authentication failed`, and nothing is written, not even an audit row, because the request dies in the session guard before anything is recorded.
+
+`GET /health/ready` therefore queries both. It used to check only the api login and report `ok`, which is exactly how a deployment served perfectly while nobody could log in.
+
+**A `$` in a password is the likely cause.** Docker Compose and the tools built on it interpolate `$` in environment values, so a password containing one arrives at the container mangled. Either escape it as `$$` wherever the deployment sets it, or use a password without `$`.
+
 ## What production refuses to start without
 
 `AppConfig` checks these at start-up rather than letting the first visitor find them. Each one is the difference between a working site and one that looks fine until somebody tries to sign in:
@@ -217,7 +227,7 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | Route | Purpose |
 |---|---|
 | `GET /health/live` | Liveness: the process is up |
-| `GET /health/ready` | Readiness: the database answers and partitions exist 7 days ahead; 503 otherwise |
+| `GET /health/ready` | Readiness: **both** database logins answer and partitions exist 7 days ahead; 503 otherwise |
 | `GET /v1/auth/providers` | Which sign-in providers this server offers |
 | `POST /v1/auth/sign-in-code` | Send a code, once the Turnstile token passes |
 | `POST /v1/auth/sign-in-code/resend` | Send another, using the pending token |

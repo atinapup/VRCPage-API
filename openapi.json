@@ -549,7 +549,7 @@
             }
           }
         },
-        "summary": "Readiness: the database answers and partitions exist 7 days ahead; 503 otherwise.",
+        "summary": "Readiness: both database logins answer and partitions exist 7 days ahead;\n503 otherwise.\n\nBoth, because the API signs in twice. Everything the site renders uses the\napi login, and Better Auth uses its own, and only the second one can sign\nanybody in. Checking one and reporting \"ok\" is how a deployment with a bad\nDB_AUTH_PASSWORD served every page perfectly while no one could log in.",
         "tags": [
           "health"
         ]

@@ -1,6 +1,7 @@
 import { Controller, Get, ServiceUnavailableException, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { sql } from 'kysely';
+import { AuthService } from '../auth/auth.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { Database } from '../database/database.js';
 import { Liveness, Readiness } from './health.dto.js';
@@ -11,6 +12,7 @@ import { Liveness, Readiness } from './health.dto.js';
 export class HealthController {
   constructor(
     private readonly db: Database,
+    private readonly auth: AuthService,
     private readonly config: AppConfig,
   ) {}
 
@@ -20,7 +22,15 @@ export class HealthController {
     return { status: 'ok' };
   }
 
-  /** Readiness: the database answers and partitions exist 7 days ahead; 503 otherwise. */
+  /**
+   * Readiness: both database logins answer and partitions exist 7 days ahead;
+   * 503 otherwise.
+   *
+   * Both, because the API signs in twice. Everything the site renders uses the
+   * api login, and Better Auth uses its own, and only the second one can sign
+   * anybody in. Checking one and reporting "ok" is how a deployment with a bad
+   * DB_AUTH_PASSWORD served every page perfectly while no one could log in.
+   */
   @Get('ready')
   async ready(): Promise<Readiness> {
     let ready: boolean;
@@ -38,6 +48,15 @@ export class HealthController {
     if (!ready) {
       throw new ServiceUnavailableException('Partitions for the next 7 days are missing; run internal.ensure_partitions().');
     }
+
+    // Better Auth's own login, on its own pool. A wrong password here is
+    // invisible to every other query the API makes.
+    try {
+      await this.auth.pool.query('SELECT 1');
+    } catch (error) {
+      throw new ServiceUnavailableException(`Better Auth cannot reach the database, so nobody can sign in: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
     return { status: 'ok', environment: this.config.environment };
   }
 }
