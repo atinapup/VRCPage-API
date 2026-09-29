@@ -45,6 +45,12 @@ export type RefreshResult =
 /** Postgres' answer when a unique index refuses a row. */
 const UNIQUE_VIOLATION = '23505';
 
+/**
+ * A refresh is one read and at most two picture downloads, each with its own
+ * timeout, so one still running after this long is never coming back.
+ */
+const ABANDONED_AFTER_MS = 5 * 60 * 1000;
+
 @Injectable()
 export class RefreshService {
   constructor(
@@ -97,6 +103,17 @@ export class RefreshService {
       .where('p.id', '=', pageId)
       .executeTakeFirstOrThrow();
 
+    // A job still running after this long was abandoned: the process stopped
+    // or threw mid-refresh. Nothing else will ever close it, and while it is
+    // open the page can't be refreshed at all, so it is closed here.
+    await this.db
+      .updateTable('vrchat.jobs')
+      .set({ status: 'failed', finishedAt: new Date(), error: 'abandoned' })
+      .where('pageId', '=', pageId)
+      .where('status', '=', 'running')
+      .where('startedAt', '<', new Date(Date.now() - ABANDONED_AFTER_MS))
+      .execute();
+
     // The job is taken before the read, so a second press finds it open.
     let jobId: string;
     try {
@@ -120,6 +137,28 @@ export class RefreshService {
       throw error;
     }
 
+    // Whatever goes wrong from here, the job is closed, or it would hold the
+    // page's one open slot until it was found abandoned.
+    try {
+      return await this.readAndStore(context, accountId, pageId, page, jobId);
+    } catch (error) {
+      await this.db
+        .updateTable('vrchat.jobs')
+        .set({ status: 'failed', finishedAt: new Date(), error: (error instanceof Error ? error.message : 'error').slice(0, 500) })
+        .where('id', '=', jobId)
+        .where('status', '=', 'running')
+        .execute();
+      throw error;
+    }
+  }
+
+  private async readAndStore(
+    context: RequestContext,
+    accountId: string,
+    pageId: string,
+    page: { kind: 'user' | 'group'; vrchatUserId: string | null; vrchatGroupId: string | null; claimedByVrchatUserId: string | null },
+    jobId: string,
+  ): Promise<RefreshResult> {
     const actor = { requestId: context.requestId, type: 'account' as const, accountId };
     const finish = (status: 'succeeded' | 'failed', error: string | null = null) =>
       this.db.updateTable('vrchat.jobs').set({ status, finishedAt: new Date(), error }).where('id', '=', jobId).execute();

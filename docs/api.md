@@ -110,7 +110,7 @@ An **alias** is another name for a page. `GET /v1/pages/{slug}` answers one with
 - **One manual refresh per page per `refresh.manual.cooldown_seconds`** (15 minutes), answered with `refresh_cooldown` and `retryAfter`.
 - **`refresh.manual.daily_cap_per_account` a UTC day** (10), answered with `refresh_daily_limit`.
 - **Owners only** while `refresh.manual.owner_only` is on.
-- **Only one open job per page**, so two quick presses can't both go out.
+- **Only one open job per page**, so two quick presses can't both go out. A refresh that fails after taking its job still closes it, and a job left `running` for five minutes is closed as `abandoned` by the next press, so a crash or restart can never lock a page out of refreshes.
 - **A read VRChat failed counts towards neither**, the same as a claim check: it said nothing about the page.
 - **An admin skips the page's wait, the daily cap and the owner-only rule**, on any page. VRChat's own turn, once a minute for the whole site, still applies to them: it protects the account every read is made with.
 
