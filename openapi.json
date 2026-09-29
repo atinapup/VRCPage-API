@@ -1527,7 +1527,7 @@
             }
           }
         },
-        "summary": "One stored icon or banner, as WebP.",
+        "summary": "One stored icon or banner, as WebP.\n\nNot rate limited: it is one indexed read by hash, and most of these come\nfrom the website's image optimizer, all from one address, so a limit\nper address would throttle every visitor together.",
         "tags": [
           "pages"
         ]

@@ -518,6 +518,7 @@ export class ClaimsService {
           bioLinks: user.bioLinks,
           pronouns: user.pronouns,
           status: user.status,
+          statusDescription: user.statusDescription,
           isAgeVerified: user.isAgeVerified,
           trustRank: user.trustRank,
           representedGroupId: user.representedGroup?.id ?? null,
