@@ -26,6 +26,10 @@ export const VRCHAT_BASE_URL = 'https://api.vrchat.cloud/api/1';
 export const ENDPOINTS = {
   user: (id: string) => `/profile/${encodeURIComponent(id)}`,
   group: (id: string) => `/groups/${encodeURIComponent(id)}`,
+  /** Signs in with Basic auth and sets the `auth` cookie, which then still needs 2FA. */
+  signIn: '/auth/user',
+  /** Finishes that sign-in with an authenticator code. */
+  verifyTotp: '/auth/twofactorauth/totp/verify',
 } as const;
 
 /** VRChat writes these with spaces; the database writes them with underscores. */

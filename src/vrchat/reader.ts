@@ -2,7 +2,7 @@
  * Where a read of VRChat comes from.
  *
  * One door, so nothing else in the API has to know whether it is talking to
- * VRChat or to the test records. With a session in the environment it is the
+ * VRChat or to the test records. With an account in the environment it is the
  * real client, with all of section 2's rules. Without one, development reads
  * the records in fake-reader.ts, and anything else gets nothing and says so.
  *
@@ -44,6 +44,6 @@ export class VRChatReader {
   }
 
   private warn(): void {
-    this.logger.warn('A read of VRChat was asked for with no session configured. Set VRCHAT_AUTH_COOKIE.');
+    this.logger.warn('A read of VRChat was asked for with no account configured. Set VRCHAT_USERNAME, VRCHAT_PASSWORD and VRCHAT_TOTP_SECRET.');
   }
 }

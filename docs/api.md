@@ -142,7 +142,7 @@ VRChat has no public API, asks that nobody query it more than once a minute, and
 **Taking a turn.** Every read locks the single `vrchat.client_state` row, checks five things, and pushes `next_call_at` forward *before* the call goes out. Only one turn exists per `vrchat.api.min_interval_seconds`, so two reads can never be in flight, across every request and every API process. The five:
 
 1. `vrchat.api.enabled`, the kill switch. Changing it takes effect on the next read, with no restart.
-2. The circuit breaker: `circuit_opened_at`, set after `vrchat.api.circuit_breaker_threshold` refused sessions in a row.
+2. The circuit breaker: `circuit_opened_at`, set after `vrchat.api.circuit_breaker_threshold` refusals in a row.
 3. The rate-limit backoff: `backoff_until`, set by a 429.
 4. The minimum spacing: `next_call_at`.
 5. The lane's share of the day, from `vrchat.budget_today`. A lane that has spent its share waits until midnight UTC; it never borrows from another.
@@ -151,9 +151,9 @@ VRChat has no public API, asks that nobody query it more than once a minute, and
 
 **A 429 stops every lane**, not just the one that caused it, because the limit is on the account. The wait doubles from `backoff_initial_seconds` to `backoff_max_seconds` with a fifth either way of jitter, and VRChat's own `Retry-After` wins when it asks for longer. `src/vrchat/budget.ts` holds that sum and its test: `node --experimental-strip-types src/vrchat/budget.ts`.
 
-**A refused session pauses everything.** Three 401s in a row open the circuit and log what to do. Pages keep serving from the database; only claims and refreshes stop. A restart closes the circuit, because a restart is how a new cookie arrives.
+**A refused session signs in again, once.** A 401 drops the stored session, and the next read signs in before it reads. Three refusals in a row, of the session or of the sign-in, open the circuit and log what to do. That's a changed password, a wrong TOTP secret or a locked account, and signing in again every minute is how an account gets locked for good. Pages keep serving from the database; only claims and refreshes stop. A restart closes the circuit, because a restart is how a fixed account arrives.
 
-**Every call is logged** to `vrchat.api_calls` with its lane, endpoint, status, outcome, duration and job, and that table is also what the daily budget counts.
+**Every read is logged** to `vrchat.api_calls` with its lane, endpoint, status, outcome, duration and job, and that table is also what the daily budget counts. Sign-ins spend no budget and go to the API's log instead.
 
 ### Which endpoints, and why
 
@@ -175,7 +175,9 @@ Nothing reads VRChat on a page view, ever. Reads come from three places only:
 - **Issuing a claim code** and **one press of "Check now"**, from the verification lane. Both cost a read, so both wait `claim.code.check_cooldown_seconds` after the account's last one; without that, giving up a claim and starting another in a loop would spend the whole lane for everybody. Asking again for the claim already open reads nothing and hands back the same code, and neither does reopening one: the name is kept on `vrchat.claim_codes.display_name` from the read that issued it.
 - **A manual refresh**, from the manual lane, behind a per-page cooldown and a per-account daily cap.
 
-**The session.** `VRCHAT_AUTH_COOKIE` holds VRChat's `auth` cookie for the service account. vrc.page never holds a VRChat password, and there is no sign-in flow here to type one into. Without the cookie, development reads the test records in `src/vrchat/fake-reader.ts` and anything else says it cannot read.
+**The session.** The API signs in as a spare account made for vrc.page: `VRCHAT_USERNAME`, `VRCHAT_PASSWORD` and `VRCHAT_TOTP_SECRET`. That's the one VRChat password vrc.page holds, and it belongs to nobody but vrc.page. Signing in is `GET /auth/user` with Basic auth, then `POST /auth/twofactorauth/totp/verify` with the code `src/vrchat/totp.ts` works out from the secret (its test: `node --experimental-strip-types src/vrchat/totp.ts`). The account needs authenticator-app 2FA, because an email code can't be answered without a person.
+
+The cookie that comes back is kept in `vrchat.client_state.auth_cookie`, which the readonly role can't see. VRChat limits how many sessions an account opens, so a restart or a second process reuses it, and only a refusal replaces it. A cookie pasted from a browser is not used, because VRChat can drop a session when the address using it changes; the server signs in from its own. Without an account, development reads the test records in `src/vrchat/fake-reader.ts` and anything else says it cannot read.
 
 ## Two database logins, and why readiness checks both
 
@@ -198,7 +200,7 @@ That means a wrong `DB_AUTH_PASSWORD` is invisible from the outside. Every page 
 | `RESEND_API_KEY` | No email means no sign-in codes. `VRCPAGE_PRINT_SIGN_IN_CODES=true` is the escape hatch for a local production build |
 | `TURNSTILE_SECRET_KEY` | The bot check fails closed, so every code would be refused |
 
-Missing `VRCHAT_AUTH_COOKIE` and `IMAGES_BASE_URL` are warnings, not failures: pages still serve from the database, they just stop being refreshed and fall back to their own art.
+A missing VRChat account and `IMAGES_BASE_URL` are warnings, not failures: pages still serve from the database, they just stop being refreshed and fall back to their own art.
 
 ## Email
 

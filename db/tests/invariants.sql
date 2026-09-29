@@ -386,6 +386,8 @@ SELECT id, expires_at, ip_address FROM auth.sessions;
 SELECT internal.test_rejects($$SELECT token FROM auth.sessions$$, 'readonly reads session tokens');
 SELECT internal.test_rejects($$SELECT access_token FROM auth.identities$$, 'readonly reads OAuth tokens');
 SELECT internal.test_rejects($$SELECT value FROM auth.verifications$$, 'readonly reads sign-in codes');
+SELECT circuit_opened_at, consecutive_auth_failures FROM vrchat.client_state;
+SELECT internal.test_rejects($$SELECT auth_cookie FROM vrchat.client_state$$, 'readonly reads the VRChat session');
 SELECT internal.test_rejects($$UPDATE pages.pages SET visibility = 'private'$$, 'readonly writes');
 RESET SESSION AUTHORIZATION;
 

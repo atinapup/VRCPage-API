@@ -538,6 +538,10 @@ export interface VrchatClaimCodes {
 }
 
 export interface VrchatClientState {
+  /**
+   * The value of VRChat's auth cookie for the service account. NULL means the next read signs in first.
+   */
+  authCookie: string | null;
   backoffSeconds: Generated<number>;
   backoffUntil: Timestamp | null;
   circuitOpenedAt: Timestamp | null;

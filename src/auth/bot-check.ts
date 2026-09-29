@@ -19,7 +19,19 @@ const TIMEOUT_MS = 10_000;
 type SiteVerifyAnswer = {
   success?: boolean;
   action?: string;
+  hostname?: string;
+  'error-codes'?: string[];
   metadata?: { result_with_testing_key?: boolean };
+};
+
+/** What Cloudflare's error codes actually mean for this setup. */
+const WHY: Record<string, string> = {
+  'invalid-input-secret': 'TURNSTILE_SECRET_KEY is not a valid secret. Check it reached the container whole.',
+  'invalid-input-response': 'The token is not valid for this secret. The site key and the secret must come from the SAME Turnstile widget.',
+  'timeout-or-duplicate': 'The token was already spent or is older than five minutes.',
+  'bad-request': 'Cloudflare could not read the request.',
+  'missing-input-response': 'No token was sent with the form.',
+  'missing-input-secret': 'No secret was sent to Cloudflare.',
 };
 
 /**
@@ -52,8 +64,19 @@ export async function passesBotCheck(
     return 'unavailable';
   }
 
-  if (answer.success !== true) return 'failed';
+  if (answer.success !== true) {
+    // Cloudflare says exactly why, and without this the refusal is silent:
+    // the page shows "couldn't confirm you're not a bot" and the server logs
+    // nothing at all, which is a bad hour to spend.
+    const codes = answer['error-codes'] ?? [];
+    const explained = codes.map((code) => WHY[code] ?? code).join(' ');
+    console.error(`Turnstile refused a token${codes.length ? ` (${codes.join(', ')})` : ''}. ${explained}`);
+    return 'failed';
+  }
   // The test keys answer without an action. Real ones always carry one.
-  if (!answer.metadata?.result_with_testing_key && answer.action !== ACTION) return 'failed';
+  if (!answer.metadata?.result_with_testing_key && answer.action !== ACTION) {
+    console.error(`Turnstile passed a token for action ${JSON.stringify(answer.action)}, but this form only accepts ${JSON.stringify(ACTION)}.`);
+    return 'failed';
+  }
   return 'passed';
 }

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { Injectable } from '@nestjs/common';
 import type { PoolConfig } from 'pg';
+import { isTotpSecret } from '../vrchat/totp.js';
 
 /** development unless NODE_ENV says production; picks the .env.<environment> file. */
 export const environment = process.env.NODE_ENV === 'production' ? 'production' : 'development';
@@ -31,6 +32,18 @@ function oauthApp(prefix: 'DISCORD' | 'GITHUB'): { clientId: string; clientSecre
   const clientId = process.env[`${prefix}_CLIENT_ID`];
   const clientSecret = process.env[`${prefix}_CLIENT_SECRET`];
   return clientId && clientSecret ? { clientId, clientSecret } : null;
+}
+
+/** The spare VRChat account the API reads with, or null unless all three are set. */
+function vrchatAccount(): { username: string; password: string; totpSecret: string } | null {
+  const username = process.env.VRCHAT_USERNAME;
+  const password = process.env.VRCHAT_PASSWORD;
+  const totpSecret = process.env.VRCHAT_TOTP_SECRET;
+  if (!username || !password || !totpSecret) return null;
+  // A mistyped secret would otherwise surface as three refused sign-ins and a
+  // paused client, long after the deploy that caused it.
+  if (!isTotpSecret(totpSecret)) throw new Error('VRCHAT_TOTP_SECRET is not base32. Copy the key VRChat shows under "enter this code manually".');
+  return { username, password, totpSecret };
 }
 
 /** Cloudflare's documented test secret: every token passes. Development only. */
@@ -94,14 +107,15 @@ export class AppConfig {
   };
 
   /**
-   * VRChat. The client carries a session cookie the operator got themselves;
-   * vrc.page never holds anyone's VRChat password. Without one, nothing is
-   * read from VRChat: pages still serve from the database, and claims and
+   * VRChat. The client signs in as a spare account made for vrc.page and
+   * keeps the session in the database, signing in again only when VRChat
+   * refuses it. This is the one VRChat password vrc.page holds, and it is its
+   * own: nobody's personal account is ever signed in to. Without it, nothing
+   * is read from VRChat: pages still serve from the database, and claims and
    * refreshes say they can't rather than pretending.
    */
   readonly vrchat = {
-    /** The value of VRChat's `auth` cookie. It lasts weeks, not for ever. */
-    authCookie: process.env.VRCHAT_AUTH_COOKIE || null,
+    account: vrchatAccount(),
   };
 
   constructor() {

@@ -104,6 +104,20 @@ export function createAuth(config: AppConfig, pool: pg.Pool, settings: AuthSetti
         // provider is trusted without that proof.
         enabled: true,
         trustedProviders: [],
+        /*
+         * Connecting a provider to the account you are already signed in to
+         * does not require its email to match. People sign up here with one
+         * address and hold Discord and GitHub on two others, which is normal
+         * and not a sign of anything.
+         *
+         * This only relaxes the deliberate act of connecting a provider while
+         * signed in: Better Auth checks this flag in the link paths only
+         * (api/routes/account.mjs and the link branch of the OAuth callback).
+         * Whether a *sign-in* may join an existing account is still decided by
+         * trustedProviders and a verified email above, so nobody reaches
+         * somebody else's account by claiming their address.
+         */
+        allowDifferentEmails: true,
         // Every account can sign in with a code sent to its email, so
         // disconnecting a provider never locks anyone out.
         allowUnlinkingAll: true,

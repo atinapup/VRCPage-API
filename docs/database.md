@@ -171,7 +171,7 @@ Together these mean a development login can't even connect to the production dat
 | Role | Login in `.env.<environment>` | Can |
 |---|---|---|
 | `vrcpage_owner` | `DB_MIGRATOR_USER` (`vrcpage_dev_migrator` / `vrcpage_prod_migrator`) | Owns every object. The migrator switches to it on login |
-| `vrcpage_api` | `DB_API_USER` | Read and write state tables within the locks above. Never sees tokens, passwords or codes |
+| `vrcpage_api` | `DB_API_USER` | Read and write state tables within the locks above. Never sees tokens, passwords or codes, except the VRChat session it signed in with itself |
 | `vrcpage_auth` | `DB_AUTH_USER` | Only the five Better Auth tables. The login gets `search_path = auth` |
 | `vrcpage_maintenance` | `DB_MAINTENANCE_USER` | Only `internal.run_maintenance()` |
 | `vrcpage_readonly` | `DB_READONLY_USER` | SELECT on everything except secret columns |
