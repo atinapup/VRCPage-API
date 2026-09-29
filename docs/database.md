@@ -51,7 +51,7 @@ Write a new migration and apply it to development with `db:migrate`. Undo it wit
 |---|---|
 | `auth` | `accounts`, `sessions`, `identities`, `verifications` and `rate_limits` (the five Better Auth tables), plus `account_roles` and `notification_preferences` |
 | `config` | `settings` (every tunable limit), `legal_documents`, `legal_acceptances` |
-| `vrchat` | `users` (connected VRChat users and their snapshot), `groups` (claimed groups), `images`, `claim_codes`, `jobs` (the request queue), `api_calls`, `client_state`; view `budget_today` |
+| `vrchat` | `users` (connected VRChat users and their snapshot), `groups` (claimed groups), `images` (their icons and banners as WebP bytes, deleted with their last use), `claim_codes`, `jobs` (the request queue), `api_calls`, `client_state`; view `budget_today` |
 | `pages` | `pages`, `slugs` (names, aliases and held names), `links`, `editor_invites`, `editors`, `custom_domains`, `views`, `view_daily`; view `page_overview` |
 | `moderation` | `bans`, `ban_evidence`, `reports`; view `active_bans` |
 | `mail` | `messages` (log and outbox), `events` (Resend webhooks), `suppressions` |

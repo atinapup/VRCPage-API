@@ -5,6 +5,7 @@ import { Audit } from '../audit/audit.js';
 import type { RequestContext } from '../common/request-context.js';
 import { Database } from '../database/database.js';
 import type { DB } from '../database/database.types.js';
+import { type Pictures, VRChatImages } from './images.js';
 import { VRChatReader } from './reader.js';
 import type { ReadFailure, ReadResult, VRChatGroup, VRChatUser } from './types.js';
 
@@ -126,6 +127,7 @@ export class ClaimsService {
     private readonly db: Database,
     private readonly audit: Audit,
     private readonly reader: VRChatReader,
+    private readonly images: VRChatImages,
   ) {}
 
   private async settings(): Promise<ClaimSettings> {
@@ -455,8 +457,11 @@ export class ClaimsService {
       return { status: 'no_match', claim: this.view({ ...checked, checkCount: count }, target.name, settings) };
     }
 
-    // The code matched. Claiming is one transaction: the VRChat record, the
-    // page it publishes, and the code being spent.
+    // The code matched. Its pictures are fetched first, outside the
+    // transaction, because a download can take seconds. Claiming is then one
+    // transaction: the VRChat record and its pictures, the page it publishes,
+    // and the code being spent.
+    const pictures = await this.images.fetch(target.user ?? target.group!);
     return this.db.write(actor, async (trx) => {
       const refusal = await this.refusal(trx, accountId, kind, target);
       if (refusal) {
@@ -482,7 +487,7 @@ export class ClaimsService {
         return { status: 'refused' as const, reason: refusal };
       }
 
-      const pageId = await this.install(trx, accountId, kind, target);
+      const pageId = await this.install(trx, accountId, kind, target, pictures);
       await trx
         .updateTable('vrchat.claimCodes')
         .set({ checkCount: count, status: 'succeeded', resolvedAt: new Date() })
@@ -499,7 +504,8 @@ export class ClaimsService {
   }
 
   /** The VRChat record and the page it publishes. Its name comes after. */
-  private async install(trx: Kysely<DB>, accountId: string, kind: ClaimKind, target: Target): Promise<string> {
+  private async install(trx: Kysely<DB>, accountId: string, kind: ClaimKind, target: Target, pictures: Pictures): Promise<string> {
+    const images = await this.images.columns(trx, pictures);
     if (kind === 'user') {
       const user = target.user!;
       await trx
@@ -517,6 +523,7 @@ export class ClaimsService {
           representedGroupId: user.representedGroup?.id ?? null,
           representedGroupName: user.representedGroup?.name ?? null,
           languages: user.languages,
+          ...images,
           fetchedAt: new Date(),
         })
         .execute();
@@ -542,6 +549,7 @@ export class ClaimsService {
         memberCount: group.memberCount,
         isVerified: group.isVerified,
         privacy: group.privacy,
+        ...images,
         fetchedAt: new Date(),
       })
       .execute();

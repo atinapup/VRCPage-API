@@ -580,11 +580,16 @@ export interface VrchatGroups {
 }
 
 export interface VrchatImages {
+  bytes: Buffer;
   byteSize: number;
   createdAt: Generated<Timestamp>;
   height: number;
   id: Generated<string>;
   sha256: Buffer;
+  /**
+   * The address VRChat gave for this picture most recently. A refresh that sees it again downloads nothing.
+   */
+  sourceUrl: string;
   width: number;
 }
 

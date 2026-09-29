@@ -73,6 +73,9 @@ export function createAuth(config: AppConfig, pool: pg.Pool, settings: AuthSetti
       deleteUser: { enabled: true },
     },
     session: {
+      // Deleting the account, a new email address and disconnecting a provider
+      // need a sign-in within the last hour, so a stolen cookie can't do them.
+      freshAge: 60 * 60,
       modelName: 'sessions',
       fields: {
         userId: 'account_id',

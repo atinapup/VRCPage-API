@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post
 import { ApiParam, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { localPath, text } from '../common/input.js';
+import { RateLimit } from '../common/rate-limit.js';
 import { requestContext } from '../common/request-context.js';
 import {
   EmailChangeConfirmRequest,
@@ -56,6 +57,7 @@ export class AuthController {
    */
   @Post('sign-in-code')
   @HttpCode(200)
+  @RateLimit('sign-in-code', 10, 600)
   requestSignInCode(@Req() request: Request, @Body() body: SignInCodeRequest): Promise<PendingSignIn> {
     return this.auth.requestSignInCode(requestContext(request), text(body, 'email', 320), text(body, 'botCheckToken', 2048));
   }
@@ -63,6 +65,7 @@ export class AuthController {
   /** Send another code to the address a pending token names. */
   @Post('sign-in-code/resend')
   @HttpCode(200)
+  @RateLimit('sign-in-code-resend', 10, 600)
   resendSignInCode(@Req() request: Request, @Body() body: ResendSignInCodeRequest): Promise<PendingSignIn> {
     return this.auth.resendSignInCode(requestContext(request), text(body, 'pendingToken', 400));
   }
@@ -70,6 +73,7 @@ export class AuthController {
   /** Sign in with a code; sets the session cookie. A first sign-in creates the account. */
   @Post('sign-in')
   @HttpCode(204)
+  @RateLimit('sign-in', 30, 600)
   async signIn(@Req() request: Request, @Res({ passthrough: true }) response: Response, @Body() body: SignInRequest): Promise<void> {
     passCookies(response, await this.auth.verifySignInCode(requestContext(request), text(body, 'email', 320), text(body, 'code', 32)));
   }
@@ -77,6 +81,7 @@ export class AuthController {
   /** Start signing in with Discord or GitHub: the address to send the browser to. */
   @Post('social/:provider/sign-in')
   @HttpCode(200)
+  @RateLimit('social', 20, 600)
   @ApiParam(PROVIDER_PARAM)
   async socialSignIn(
     @Req() request: Request,
@@ -98,6 +103,7 @@ export class AuthController {
   /** Start connecting Discord or GitHub to the signed-in account. */
   @Post('social/:provider/link')
   @HttpCode(200)
+  @RateLimit('social', 20, 600)
   @UseGuards(SessionGuard)
   @ApiParam(PROVIDER_PARAM)
   async socialLink(

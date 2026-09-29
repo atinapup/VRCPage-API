@@ -49,6 +49,15 @@ function vrchatAccount(): { username: string; password: string; totpSecret: stri
 /** Cloudflare's documented test secret: every token passes. Development only. */
 const TURNSTILE_TEST_SECRET = '1x0000000000000000000000000000000AA';
 
+function isLoopbackOrigin(origin: string): boolean {
+  try {
+    const host = new URL(origin).hostname;
+    return host === 'localhost' || host.endsWith('.localhost') || host === '127.0.0.1' || host === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
 function databaseLogin(key: 'API' | 'AUTH'): PoolConfig {
   const sslMode = process.env.DB_SSL_MODE ?? 'disable';
   if (!(sslMode in SSL_MODES)) throw new Error(`DB_SSL_MODE "${sslMode}" is not one of: ${Object.keys(SSL_MODES).join(', ')}.`);
@@ -69,16 +78,17 @@ export class AppConfig {
   readonly environment = environment;
   readonly port = Number(process.env.PORT ?? 4000);
   /**
-   * The website's origin. Allowed by CORS, and Better Auth's base URL: the
-   * website proxies /api/auth/* here, so OAuth callbacks and cookies belong to it.
+   * The website's origin, and Better Auth's base URL: the website proxies
+   * /api/auth/* here, so OAuth callbacks and cookies belong to it.
    */
   readonly webOrigin = required('WEB_ORIGIN');
   readonly database = { api: databaseLogin('API'), auth: databaseLogin('AUTH') };
   /**
-   * Where our copies of VRChat images are served from (R2 keys are
-   * images/<sha256 hex>.webp). Without it, pages show their fallback art.
+   * Shared with the website, which sends it as X-VRCPage-Secret on every call.
+   * Without it nobody but the website can reach the API, so nobody else can
+   * claim a visitor's address in X-Forwarded-For. Required in production.
    */
-  readonly imagesBaseUrl = process.env.IMAGES_BASE_URL?.replace(/\/+$/, '') || null;
+  readonly apiSecret = process.env.VRCPAGE_API_SECRET || null;
   readonly auth = {
     /** Signs sessions, OAuth state and pending sign-in tokens. At least 32 random characters. */
     secret: required('BETTER_AUTH_SECRET'),
@@ -119,6 +129,17 @@ export class AppConfig {
   };
 
   constructor() {
+    // Development serves /v1/dev (every sign-in code), passes every bot check
+    // and publishes the docs. A deployment that forgot NODE_ENV would do all
+    // of that in public, so development only runs for a website on this machine.
+    if (environment === 'development' && !isLoopbackOrigin(this.webOrigin)) {
+      throw new Error(
+        `NODE_ENV is not "production", but WEB_ORIGIN is ${this.webOrigin}. Development mode exposes every sign-in code, so it only runs for a localhost website. Set NODE_ENV=production.`,
+      );
+    }
+    if (environment === 'production' && (this.apiSecret?.length ?? 0) < 32) {
+      throw new Error('VRCPAGE_API_SECRET is not set (at least 32 characters). Without it anyone could call the API as if they were the website.');
+    }
     // A deployment with no sender can't sign anyone in, so it fails here
     // rather than at the first person who tries. The escape hatch is for
     // running a production build locally, never for a deployed one.

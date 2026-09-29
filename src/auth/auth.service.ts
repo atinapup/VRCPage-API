@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { isIP } from 'node:net';
 import { Injectable, Logger, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
 import { APIError } from 'better-auth/api';
@@ -11,7 +11,7 @@ import { Database } from '../database/database.js';
 import { MailService } from '../mail/mail.service.js';
 import { type Auth, type AuthSettings, createAuth } from './auth.js';
 import { passesBotCheck } from './bot-check.js';
-import { claimCooldown, clearCooldown, releaseCooldown } from './cooldown.js';
+import { claimCooldown, clearCooldown, hit, releaseCooldown, unhit } from './cooldown.js';
 import { issuePendingToken, readPendingToken } from './pending.js';
 
 export const SOCIAL_PROVIDERS = ['discord', 'github'] as const;
@@ -31,6 +31,27 @@ const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function normalize(email: string): string {
   return email.trim().toLowerCase();
 }
+
+/** An address as a rate-limit key: hashed, so the counters never hold one. */
+function addressId(email: string): string {
+  return createHash('sha256').update(email).digest('base64url');
+}
+
+/** "someone@example.com" as "s•••@example.com", for telling one address about another. */
+function mask(email: string): string {
+  const at = email.lastIndexOf('@');
+  return `${email.slice(0, 1)}•••${email.slice(at)}`;
+}
+
+/*
+ * Limits per email address and per account, on top of the per-IP ones every
+ * route has (src/common/rate-limit.ts). An IP is cheap to change; the address
+ * a code goes to is not.
+ */
+const CODES_PER_HOUR = 5;
+const CODES_PER_DAY = 15;
+const WRONG_CODES_PER_HOUR = 10;
+const EMAIL_CHANGES_PER_HOUR = 5;
 
 function errorCode(error: unknown): string | undefined {
   if (!(error instanceof APIError)) return undefined;
@@ -186,8 +207,9 @@ export class AuthService implements OnModuleInit, OnApplicationShutdown {
 
   /**
    * The answer is the same whether or not the address has an account, so this
-   * can't be used to find out who has one. The exception is when sign-ups are
-   * closed, where saying so is the point.
+   * can't be used to find out who has one. That holds while sign-ups are
+   * closed too: an address with no account is emailed to say so, and the page
+   * moves on to the code step exactly as it would for one that has.
    *
    * Inside the cooldown no code is sent, but the answer still carries a pending
    * token, dated to the code that did go out: a code reached this address a
@@ -198,21 +220,28 @@ export class AuthService implements OnModuleInit, OnApplicationShutdown {
     const email = normalize(rawEmail);
     if (!EMAIL_SHAPE.test(email) || email.length > 254) throw new Problem(400, 'invalid_email', 'That is not an email address.');
 
-    if (!this.settings.signupsOpen) {
-      const auth = await this.auth.$context;
-      if (!(await auth.internalAdapter.findUserByEmail(email))) {
-        await this.log(context, { action: 'email_code.sent', result: 'denied', actorType: 'anonymous', metadata: { reason: 'signups_closed' }, security: true });
-        throw new Problem(403, 'signups_closed', 'New accounts are closed for now.');
-      }
-    }
-
     const key = `email-code:${email}`;
     const slot = await claimCooldown(this.pool, key, this.settings.resendCooldownSeconds);
     if (slot.wait > 0) {
       return { pendingToken: issuePendingToken(this.config.auth.secret, email, slot.previous ?? Date.now()), sent: false, resendIn: slot.wait };
     }
 
+    // However many bot checks pass, one address gets only a few codes an hour
+    // and a day. Without this one check bought a code a minute for ever,
+    // through resends, and a code has 6 digits.
+    const wait = await this.spendCode(email);
+    if (wait > 0) {
+      await releaseCooldown(this.pool, key, slot.previous);
+      await this.log(context, { action: 'email_code.sent', result: 'denied', actorType: 'anonymous', metadata: { reason: 'rate_limited' }, security: true });
+      throw new Problem(429, 'rate_limited', 'Too many codes have gone to this address. Try again later.', wait);
+    }
+
     try {
+      if (!this.settings.signupsOpen && !(await (await this.auth.$context).internalAdapter.findUserByEmail(email))) {
+        await this.refuseSignUp(email);
+        await this.log(context, { action: 'email_code.sent', result: 'denied', actorType: 'anonymous', metadata: { reason: 'signups_closed' }, security: true });
+        return { pendingToken: issuePendingToken(this.config.auth.secret, email), sent: true, resendIn: this.settings.resendCooldownSeconds };
+      }
       await this.auth.api.sendVerificationOTP({ body: { email, type: 'sign-in' }, headers: context.headers });
     } catch (error) {
       await releaseCooldown(this.pool, key, slot.previous);
@@ -224,6 +253,28 @@ export class AuthService implements OnModuleInit, OnApplicationShutdown {
 
     await this.log(context, { action: 'email_code.sent', actorType: 'anonymous', security: true });
     return { pendingToken: issuePendingToken(this.config.auth.secret, email), sent: true, resendIn: this.settings.resendCooldownSeconds };
+  }
+
+  /** Spend one of this address's codes for the hour and the day. The wait in seconds when either is used up, or 0. */
+  private async spendCode(email: string): Promise<number> {
+    const id = addressId(email);
+    const hour = await hit(this.pool, `codes-hour:${id}`, CODES_PER_HOUR, 60 * 60);
+    if (!hour.ok) return hour.wait;
+    const day = await hit(this.pool, `codes-day:${id}`, CODES_PER_DAY, 24 * 60 * 60);
+    if (day.ok) return 0;
+    await unhit(this.pool, `codes-hour:${id}`);
+    return day.wait;
+  }
+
+  /**
+   * Sign-ups are closed and this address has no account. Its owner is told so
+   * by email, and a code nobody ever sees is stored for it, so that guessing
+   * codes for it runs out exactly the way it does for an address that has an
+   * account. Neither the page nor the code step can tell the two apart.
+   */
+  private async refuseSignUp(email: string): Promise<void> {
+    await this.auth.api.createVerificationOTP({ body: { email, type: 'sign-in' } });
+    await this.mail.send({ to: email, accountId: null, template: 'signups_closed', props: {}, category: 'auth' });
   }
 
   /**
@@ -247,6 +298,16 @@ export class AuthService implements OnModuleInit, OnApplicationShutdown {
     const email = normalize(rawEmail);
     const otp = rawCode.replace(/\D/g, '');
     if (otp.length !== this.settings.codeLength) throw new Problem(400, 'wrong_code', 'That code does not match.');
+
+    // Each code allows a few tries, but a new code brings new tries. This caps
+    // guesses at one address across all its codes. A correct code gives its
+    // try back below, so only wrong ones count.
+    const tries = `code-tries:${addressId(email)}`;
+    const budget = await hit(this.pool, tries, WRONG_CODES_PER_HOUR, 60 * 60);
+    if (!budget.ok) {
+      await this.log(context, { action: 'email_code.failed', result: 'denied', actorType: 'anonymous', metadata: { reason: 'rate_limited' }, security: true });
+      throw new Problem(429, 'rate_limited', 'Too many wrong codes for this address. Wait a while, then ask for a new one.', budget.wait);
+    }
 
     let headers: CookieHeaders;
     try {
@@ -273,6 +334,7 @@ export class AuthService implements OnModuleInit, OnApplicationShutdown {
     }
 
     await clearCooldown(this.pool, `email-code:${email}`);
+    await unhit(this.pool, tries);
     await this.log(context, { action: 'email_code.verified', actorType: 'anonymous', security: true });
     return headers;
   }
@@ -362,6 +424,11 @@ export class AuthService implements OnModuleInit, OnApplicationShutdown {
     const newEmail = normalize(rawEmail);
     if (!EMAIL_SHAPE.test(newEmail) || newEmail.length > 254) throw new Problem(400, 'invalid_email', 'That is not an email address.');
 
+    // The cooldown below is per address, so on its own one account could have
+    // vrc.page mail any number of strangers, one after another.
+    const allowance = await hit(this.pool, `email-change:${viewer.accountId}`, EMAIL_CHANGES_PER_HOUR, 60 * 60);
+    if (!allowance.ok) throw new Problem(429, 'rate_limited', 'You have asked for several codes in a short time. Try again later.', allowance.wait);
+
     const key = `email-change:${newEmail}`;
     const slot = await claimCooldown(this.pool, key, this.settings.resendCooldownSeconds);
     if (slot.wait > 0) throw new Problem(429, 'cooldown', 'A code was sent to this address moments ago.', slot.wait);
@@ -404,6 +471,15 @@ export class AuthService implements OnModuleInit, OnApplicationShutdown {
 
     await clearCooldown(this.pool, `email-change:${newEmail}`);
     await this.log(context, { action: 'account.email_changed', actorType: 'account', actorAccountId: viewer.accountId, security: true });
+    // The old address hears about it, so a stolen session can't move the
+    // account away without its owner ever knowing.
+    await this.mail.enqueue({
+      to: viewer.email,
+      accountId: viewer.accountId,
+      template: 'email_changed',
+      props: { newEmail: mask(newEmail) },
+      category: 'transactional',
+    });
   }
 
   /**

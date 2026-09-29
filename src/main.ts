@@ -1,12 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule } from '@nestjs/swagger';
 import { toNodeHandler } from 'better-auth/node';
-import type { Express } from 'express';
+import type { Express, NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module.js';
 import { AuthService } from './auth/auth.service.js';
 import { buildOpenApiDocument, configureRoutes } from './app.setup.js';
 import { ProblemDetailsFilter } from './common/problem-details.filter.js';
-import { requestId } from './common/request-id.js';
+import { fromWebsite, requestId } from './common/request-id.js';
 import { AppConfig, loadEnvironmentFile } from './config/app-config.js';
 
 loadEnvironmentFile();
@@ -15,22 +15,38 @@ loadEnvironmentFile();
 // so re-serialising the parsed JSON would fail every signature.
 const app = await NestFactory.create(AppModule, { rawBody: true });
 const config = app.get(AppConfig);
+const express = app.getHttpAdapter().getInstance() as Express;
+express.disable('x-powered-by');
 
+// Only the website may call the API (docs/api.md, "Sign-in"). Anything
+// without the shared secret gets the answer a missing route would, except the
+// health checks load balancers make.
+app.use(fromWebsite(config.apiSecret));
 app.use(requestId);
+// Every answer is JSON for the website's server or a redirect: nothing a
+// browser should sniff or a cache should keep.
+app.use((request: Request, response: Response, next: NextFunction) => {
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  if (!request.path.startsWith('/docs')) response.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
 // Better Auth's own endpoints, which the website proxies from its /api/auth/*:
-// the Discord and GitHub callbacks, and the header's "am I signed in" check.
-// Everything else goes through /v1/auth. Registered here, ahead of the body
-// parsers Nest adds on start, which would consume the body Better Auth reads
-// itself. The instance only exists once the app has started, hence the lookup.
+// the Discord and GitHub callbacks (and the error page they can land on), and
+// the header's "am I signed in" check. Nothing else of Better Auth's is served:
+// every change goes through /v1/auth, where it is rate limited and audited.
+// Registered here, ahead of the body parsers Nest adds on start, which would
+// consume the body Better Auth reads itself. The instance only exists once the
+// app has started, hence the lookup.
+const BETTER_AUTH_PATHS = /^\/api\/auth\/(get-session|error|callback\/(discord|github))$/;
 const auth = app.get(AuthService);
 let authHandler: ReturnType<typeof toNodeHandler> | undefined;
-(app.getHttpAdapter().getInstance() as Express).all('/api/auth/*splat', (request, response) => {
+express.get('/api/auth/*splat', (request, response) => {
+  if (!BETTER_AUTH_PATHS.test(request.path)) return void response.status(404).end();
   authHandler ??= toNodeHandler(auth.auth);
   return authHandler(request, response);
 });
 app.useGlobalFilters(new ProblemDetailsFilter());
-app.enableCors({ origin: config.webOrigin, credentials: true, exposedHeaders: ['X-Request-Id'] });
 app.enableShutdownHooks();
 configureRoutes(app);
 

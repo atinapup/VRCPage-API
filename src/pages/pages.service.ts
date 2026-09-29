@@ -6,6 +6,8 @@ import { AppConfig } from '../config/app-config.js';
 import { Database } from '../database/database.js';
 import { MailService } from '../mail/mail.service.js';
 import type { DB } from '../database/database.types.js';
+import { imagePath } from '../vrchat/images.js';
+import { checkLink } from './links.js';
 import type {
   Dashboard,
   NameAvailability,
@@ -20,6 +22,9 @@ import type {
 } from './pages.dto.js';
 
 type Visibility = UserPage['visibility'];
+
+/** VRChat's links are VRChat's to moderate; ours alone go through links.custom.blocked_hosts. */
+const NOTHING_BLOCKED: ReadonlySet<string> = new Set();
 
 /** What an account may do with a page. Anything else is not its page at all. */
 export type PageRole = 'owner' | 'editor';
@@ -68,10 +73,6 @@ export class PagesService {
     return row.edits ? 'editor' : null;
   }
 
-  private imageUrl(sha256: Buffer | null): string | null {
-    return sha256 && this.config.imagesBaseUrl ? `${this.config.imagesBaseUrl}/images/${sha256.toString('hex')}.webp` : null;
-  }
-
   private async primarySlug(pageId: string): Promise<string | null> {
     const row = await this.db
       .selectFrom('pages.slugs')
@@ -98,11 +99,16 @@ export class PagesService {
     return row?.slug ?? null;
   }
 
-  /** VRChat's links first, then the page's own, in order. */
+  /**
+   * VRChat's links first, then the page's own, in order. VRChat's are stored
+   * as VRChat sent them, so they pass the same check as ours on the way out:
+   * only plain https ever reaches a page.
+   */
   private async links(pageId: string, fromVRChat: string[]): Promise<PageLink[]> {
     const own = await this.db.selectFrom('pages.links').select(['url', 'label']).where('pageId', '=', pageId).orderBy('position').execute();
+    const checked = fromVRChat.map((raw) => checkLink(raw, NOTHING_BLOCKED)).filter((link) => link.status === 'ok');
     return [
-      ...fromVRChat.map((url) => ({ url, label: null, source: 'vrchat' as const })),
+      ...checked.map(({ url }) => ({ url, label: null, source: 'vrchat' as const })),
       ...own.map((link) => ({ url: link.url, label: link.label, source: 'vrcpage' as const })),
     ];
   }
@@ -151,8 +157,8 @@ export class PagesService {
       bio: row.bio || null,
       links: await this.links(pageId, row.bioLinks),
       languages: row.languages,
-      bannerUrl: this.imageUrl(row.bannerSha256),
-      avatarUrl: this.imageUrl(row.iconSha256),
+      bannerUrl: imagePath(row.bannerSha256),
+      avatarUrl: imagePath(row.iconSha256),
       verifiedAt: row.connectedAt.toISOString(),
       lastRefreshedAt: row.fetchedAt.toISOString(),
       visibility: row.visibility,
@@ -204,8 +210,8 @@ export class PagesService {
       languages: row.languages,
       memberCount: row.memberCount,
       isVerified: row.isVerified,
-      iconUrl: this.imageUrl(row.iconSha256),
-      bannerUrl: this.imageUrl(row.bannerSha256),
+      iconUrl: imagePath(row.iconSha256),
+      bannerUrl: imagePath(row.bannerSha256),
       owner: { displayName: row.ownerName, slug: ownerPublic ? await this.primarySlug(row.ownerPageId!) : null },
       verifiedAt: row.claimedAt.toISOString(),
       lastRefreshedAt: row.fetchedAt.toISOString(),

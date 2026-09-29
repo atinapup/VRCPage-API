@@ -52,6 +52,12 @@ const TIMEOUT_MS = 15_000;
 /** What a refusal reports when the wait isn't a number we know. */
 const A_WHILE = 3600;
 
+/** A picture past this is not a VRChat icon or banner, and is not held in memory to find out. */
+const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
+
+/** Where VRChat keeps pictures. Nothing else is fetched: the server sits on a private network. */
+const VRCHAT_HOST = /(^|\.)vrchat\.(cloud|com)$/;
+
 type Settings = {
   enabled: boolean;
   minIntervalSeconds: number;
@@ -132,6 +138,46 @@ export class VRChatClient implements OnApplicationBootstrap {
 
   getGroup(lane: Lane, id: string, jobId?: string): Promise<ReadResult<VRChatGroup>> {
     return this.read(lane, 'get_group', id, jobId, (body) => readGroup(body, id));
+  }
+
+  /**
+   * The bytes of a picture a read pointed at, or null.
+   *
+   * Pictures take no slot and spend no budget. They are files, not reads, and
+   * images.ts only asks for an address it has never stored, which is once per
+   * upload rather than once per read. The kill switch, the circuit and a
+   * backoff still stop them. The session goes only to api.vrchat.cloud, and
+   * fetch drops it if VRChat redirects to its file host.
+   */
+  async download(url: string): Promise<Buffer | null> {
+    const address = new URL(url);
+    if (address.protocol !== 'https:' || !VRCHAT_HOST.test(address.hostname)) return null;
+
+    const [settings, state] = await Promise.all([
+      this.settings(),
+      this.db.selectFrom('vrchat.clientState').select(['authCookie', 'circuitOpenedAt', 'backoffUntil']).executeTakeFirstOrThrow(),
+    ]);
+    if (!settings.enabled || state.circuitOpenedAt || (state.backoffUntil && state.backoffUntil > new Date())) return null;
+
+    try {
+      const response = await fetch(address, {
+        headers: {
+          'user-agent': settings.userAgent,
+          ...(address.hostname === 'api.vrchat.cloud' && state.authCookie ? { cookie: `auth=${state.authCookie}` } : {}),
+        },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        this.logger.warn(`A picture from VRChat answered ${response.status}: ${url}`);
+        return null;
+      }
+      if (Number(response.headers.get('content-length')) > MAX_IMAGE_BYTES) return null;
+      const bytes = Buffer.from(await response.arrayBuffer());
+      return bytes.length <= MAX_IMAGE_BYTES ? bytes : null;
+    } catch (error) {
+      this.logger.warn(`A picture from VRChat could not be fetched (${error instanceof Error ? error.message : String(error)}): ${url}`);
+      return null;
+    }
   }
 
   private async read<T>(lane: Lane, endpoint: VrchatEndpoint, id: string, jobId: string | undefined, parse: (body: unknown) => T | null): Promise<ReadResult<T>> {

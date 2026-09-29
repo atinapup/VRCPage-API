@@ -5,6 +5,7 @@ import type { Viewer } from '../auth/auth.service.js';
 import { CurrentViewer, SessionGuard } from '../auth/session.guard.js';
 import { text } from '../common/input.js';
 import { Problem } from '../common/problem.js';
+import { RateLimit } from '../common/rate-limit.js';
 import { requestContext } from '../common/request-context.js';
 import { Editor, GroupEditors, Invitation, InviteRequest } from './editors.dto.js';
 import { EditorsService } from './editors.service.js';
@@ -71,6 +72,7 @@ export class EditorsController {
   /** Ask the person at a vrc.page name to help run this group. Owners only. */
   @Post('groups/:pageId/editors')
   @HttpCode(200)
+  @RateLimit('invite', 30, 3600)
   async invite(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string, @Body() body: InviteRequest): Promise<Editor> {
     const name = text(body, 'name', 64);
     const result = UUID.test(pageId)

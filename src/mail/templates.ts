@@ -63,6 +63,9 @@ export type TemplateProps = {
   welcome: { dashboardUrl: string };
   name_claimed: { slug: string; pageUrl: string; cooldownDays: number };
   account_deleted: { tombstoneDays: number };
+  /** To the old address. The new one arrives masked, as "s•••@example.com". */
+  email_changed: { newEmail: string };
+  signups_closed: Record<string, never>;
 };
 
 export type TemplateName = keyof TemplateProps;
@@ -126,6 +129,27 @@ const TEMPLATES: { [K in TemplateName]: (props: TemplateProps[K]) => Content } =
       `Your page names are held for ${tombstoneDays} days before anyone else can take them, so links that were shared don't quietly lead somewhere else.`,
     ],
     note: "This is the last email we'll send you.",
+  }),
+
+  email_changed: ({ newEmail }) => ({
+    subject: 'Your vrc.page email address was changed',
+    preheader: `Your account now signs in with ${newEmail}.`,
+    heading: 'Your email address was changed',
+    paragraphs: [
+      `Your vrc.page account now signs in with ${newEmail}, so codes go there from now on and not to this address.`,
+    ],
+    note: "If you made this change, there's nothing to do. If you didn't, reply to this email straight away and we'll help you get your account back.",
+  }),
+
+  signups_closed: () => ({
+    subject: 'Signing in to vrc.page',
+    preheader: "There's no account for this address yet, and new accounts are paused.",
+    heading: 'No account for this address',
+    paragraphs: [
+      "Someone asked to sign in to vrc.page with this address. There's no account for it, and new accounts are paused right now, so no code was sent.",
+      'If you have an account under another address, sign in with that one instead.',
+    ],
+    note: "If this wasn't you, ignore this email. Nothing has happened.",
   }),
 };
 

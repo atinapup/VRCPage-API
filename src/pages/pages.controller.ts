@@ -5,6 +5,7 @@ import type { Viewer } from '../auth/auth.service.js';
 import { CurrentViewer, SessionGuard } from '../auth/session.guard.js';
 import { choice, optionalFlag, text } from '../common/input.js';
 import { Problem } from '../common/problem.js';
+import { RateLimit } from '../common/rate-limit.js';
 import { requestContext } from '../common/request-context.js';
 import {
   Dashboard,
@@ -38,6 +39,7 @@ export class PagesController {
 
   /** The public page at vrc.page/<slug>. Private, hidden, held and unknown names are one identical 404. */
   @Get(':slug')
+  @RateLimit('pages', 240, 60)
   async bySlug(@Param('slug') slug: string): Promise<PublicPage> {
     if (!NAME.test(slug)) throw noPage();
     const page = await this.pages.publicPage(slug);
@@ -131,6 +133,7 @@ export class MeController {
    * comes back as "yours" rather than "taken".
    */
   @Get('names/:name')
+  @RateLimit('names', 30, 60)
   nameAvailability(@Param('name') name: string, @Query('pageId') pageId?: string): Promise<NameAvailability> {
     return this.pages.nameAvailability(name, pageId && UUID.test(pageId) ? pageId : null);
   }

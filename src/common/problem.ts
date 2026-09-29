@@ -47,6 +47,7 @@ export const PROBLEM_CODES = [
   'name_cooldown',
   'session_stale',
   'not_signed_in',
+  'rate_limited',
   'unavailable',
 ] as const;
 export type ProblemCode = (typeof PROBLEM_CODES)[number];

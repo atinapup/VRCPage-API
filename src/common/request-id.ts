@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 
 declare module 'express-serve-static-core' {
@@ -21,4 +21,21 @@ export function requestId(request: Request, response: Response, next: NextFuncti
   request.headers['x-request-id'] = request.id;
   response.setHeader('X-Request-Id', request.id);
   next();
+}
+
+/**
+ * Lets a request in only with the secret the website sends as X-VRCPage-Secret,
+ * so the website is the only caller and its X-Forwarded-For the only one ever
+ * believed. Anything else gets a bare 404, as if nothing were here. The health
+ * checks stay open for load balancers. Without a secret (development) every
+ * caller is let in.
+ */
+export function fromWebsite(secret: string | null) {
+  const expected = secret ? Buffer.from(secret) : null;
+  return (request: Request, response: Response, next: NextFunction): void => {
+    if (!expected || request.path.startsWith('/health/')) return next();
+    const given = Buffer.from(request.get('x-vrcpage-secret') ?? '');
+    if (given.length === expected.length && timingSafeEqual(given, expected)) return next();
+    response.status(404).end();
+  };
 }

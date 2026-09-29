@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import type { Kysely } from 'kysely';
 import { Audit } from '../audit/audit.js';
 import type { RequestContext } from '../common/request-context.js';
-import { AppConfig } from '../config/app-config.js';
 import { Database } from '../database/database.js';
 import type { DB } from '../database/database.types.js';
+import { imagePath } from '../vrchat/images.js';
 import type { Editor, GroupEditors, Invitation } from './editors.dto.js';
 import { PagesService } from './pages.service.js';
 
@@ -29,7 +29,7 @@ export type InviteResult =
   | { status: 'ok'; editor: Editor }
   | { status: 'not_found' }
   | { status: 'not_allowed' }
-  /** No page has that name, or it is a group's rather than a person's. */
+  /** No page has that name, it is a group's rather than a person's, or it is private or hidden. */
   | { status: 'no_such_page' }
   | { status: 'yourself' }
   | { status: 'already_editor' }
@@ -44,7 +44,6 @@ export type RemoveResult = { status: 'ok' } | { status: 'not_found' } | { status
 export class EditorsService {
   constructor(
     private readonly db: Database,
-    private readonly config: AppConfig,
     private readonly audit: Audit,
     private readonly pages: PagesService,
   ) {}
@@ -77,11 +76,7 @@ export class EditorsService {
             .executeTakeFirst()
         )?.slug ?? null)
       : null;
-    return { name: row.displayName, slug, iconUrl: this.imageUrl(row.iconSha256) };
-  }
-
-  private imageUrl(sha256: Buffer | null): string | null {
-    return sha256 && this.config.imagesBaseUrl ? `${this.config.imagesBaseUrl}/images/${sha256.toString('hex')}.webp` : null;
+    return { name: row.displayName, slug, iconUrl: imagePath(row.iconSha256) };
   }
 
   /** Seats taken plus invitations still waiting: what the cap counts. */
@@ -136,6 +131,8 @@ export class EditorsService {
 
       // The name is how people know each other here, so it is what an
       // invitation is addressed to. Only a person's page has somebody behind it.
+      // A private or hidden page is the same "nobody has that name" as a
+      // missing one: the answer would otherwise show its name and picture.
       const found = await trx
         .selectFrom('pages.slugs as s')
         .innerJoin('pages.pages as p', 'p.id', 's.pageId')
@@ -143,6 +140,8 @@ export class EditorsService {
         .select(['u.accountId'])
         .where('s.slugKey', '=', name.trim().toLowerCase())
         .where('p.kind', '=', 'user')
+        .where('p.visibility', '!=', 'private')
+        .where('p.hiddenAt', 'is', null)
         .executeTakeFirst();
       if (!found) return { status: 'no_such_page' as const };
       if (found.accountId === accountId) return { status: 'yourself' as const };
@@ -202,7 +201,7 @@ export class EditorsService {
         id: row.id,
         groupName: row.name,
         groupSlug: slug?.slug ?? null,
-        groupIconUrl: this.imageUrl(row.iconSha256),
+        groupIconUrl: imagePath(row.iconSha256),
         memberCount: row.memberCount,
         invitedBy: (await this.person(this.db, row.invitedByAccountId)).name,
         sentAt: row.createdAt.toISOString(),

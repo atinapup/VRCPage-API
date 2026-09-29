@@ -1,15 +1,19 @@
-import { Controller, Get, ServiceUnavailableException, VERSION_NEUTRAL } from '@nestjs/common';
+import { Controller, Get, Logger, ServiceUnavailableException, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { sql } from 'kysely';
 import { AuthService } from '../auth/auth.service.js';
+import { RateLimit } from '../common/rate-limit.js';
 import { AppConfig } from '../config/app-config.js';
 import { Database } from '../database/database.js';
 import { Liveness, Readiness } from './health.dto.js';
 
 /** Unversioned, for load balancers and uptime checks. */
 @ApiTags('health')
+@RateLimit(false)
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
+  private readonly logger = new Logger(HealthController.name);
+
   constructor(
     private readonly db: Database,
     private readonly auth: AuthService,
@@ -50,11 +54,13 @@ export class HealthController {
     }
 
     // Better Auth's own login, on its own pool. A wrong password here is
-    // invisible to every other query the API makes.
+    // invisible to every other query the API makes. The database's own words
+    // (host, login name) go to the log, not to whoever asked: this is public.
     try {
       await this.auth.pool.query('SELECT 1');
     } catch (error) {
-      throw new ServiceUnavailableException(`Better Auth cannot reach the database, so nobody can sign in: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error('Better Auth cannot reach the database, so nobody can sign in.', error instanceof Error ? error.message : String(error));
+      throw new ServiceUnavailableException('Better Auth cannot reach the database, so nobody can sign in.');
     }
 
     return { status: 'ok', environment: this.config.environment };

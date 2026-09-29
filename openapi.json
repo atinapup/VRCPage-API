@@ -1491,6 +1491,48 @@
         ]
       }
     },
+    "/v1/images/{file}": {
+      "get": {
+        "operationId": "imagesImage",
+        "parameters": [
+          {
+            "name": "file",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One stored icon or banner, as WebP.",
+        "tags": [
+          "pages"
+        ]
+      }
+    },
     "/v1/dev/vrchat/world": {
       "get": {
         "operationId": "devWorld",

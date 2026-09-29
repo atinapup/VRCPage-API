@@ -13,6 +13,7 @@ import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import { randomUUID } from 'node:crypto';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
+import { RateLimit } from '../common/rate-limit.js';
 import { AppConfig } from '../config/app-config.js';
 import { Database } from '../database/database.js';
 import type { MailMessageStatus, MailSuppressionReason } from '../database/database.types.js';
@@ -84,6 +85,7 @@ export class MailController {
   @Post('resend')
   @HttpCode(204)
   @ApiExcludeEndpoint()
+  @RateLimit(false)
   async resend(@Req() request: RawBodyRequest<Request>): Promise<void> {
     const secret = this.config.mail.webhookSecret;
     const body = request.rawBody;

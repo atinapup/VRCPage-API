@@ -49,10 +49,18 @@ export function checkLink(raw: string, blocked: ReadonlySet<string>): LinkCheck 
 
   const host = url.hostname.toLowerCase().replace(/^www\./, '');
   if (!host.includes('.') || host.startsWith('.') || host.endsWith('.')) return { status: 'not_url' };
-  if (blocked.has(host)) return { status: 'blocked', host };
+  if (isBlocked(host, blocked)) return { status: 'blocked', host };
   if (url.href.length > 2048) return { status: 'not_url' };
 
   return { status: 'ok', url: url.href, host };
+}
+
+/** A blocked host blocks its subdomains too: "grabify.link" also refuses "x.grabify.link". */
+function isBlocked(host: string, blocked: ReadonlySet<string>): boolean {
+  for (let at = host; at.includes('.'); at = at.slice(at.indexOf('.') + 1)) {
+    if (blocked.has(at)) return true;
+  }
+  return false;
 }
 
 /**

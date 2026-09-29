@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Audit } from '../audit/audit.js';
 import type { RequestContext } from '../common/request-context.js';
 import { Database } from '../database/database.js';
+import { VRChatImages } from '../vrchat/images.js';
 import { VRChatReader } from '../vrchat/reader.js';
 import { PagesService } from './pages.service.js';
 
@@ -51,6 +52,7 @@ export class RefreshService {
     private readonly audit: Audit,
     private readonly pages: PagesService,
     private readonly reader: VRChatReader,
+    private readonly images: VRChatImages,
   ) {}
 
   private async settings() {
@@ -134,6 +136,8 @@ export class RefreshService {
       return { status: 'gone' };
     }
 
+    // Pictures are fetched before the transaction: a download can take seconds.
+    const pictures = await this.images.fetch(read.value);
     const now = new Date();
     const outcome = await this.db.write(actor, async (trx) => {
       if (userRead?.ok) {
@@ -152,6 +156,7 @@ export class RefreshService {
             representedGroupId: value.representedGroup?.id ?? null,
             representedGroupName: value.representedGroup?.name ?? null,
             languages: value.languages,
+            ...(await this.images.columns(trx, pictures)),
             fetchedAt: now,
             lastFetchError: null,
             lastFetchErrorAt: null,
@@ -199,6 +204,7 @@ export class RefreshService {
           isVerified: value.isVerified,
           privacy: value.privacy,
           ownerVrchatUserId: value.ownerId,
+          ...(await this.images.columns(trx, pictures)),
           fetchedAt: now,
           lastFetchError: null,
           lastFetchErrorAt: null,

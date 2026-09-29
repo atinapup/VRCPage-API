@@ -179,6 +179,17 @@ Nothing reads VRChat on a page view, ever. Reads come from three places only:
 
 The cookie that comes back is kept in `vrchat.client_state.auth_cookie`, which the readonly role can't see. VRChat limits how many sessions an account opens, so a restart or a second process reuses it, and only a refusal replaces it. A cookie pasted from a browser is not used, because VRChat can drop a session when the address using it changes; the server signs in from its own. Without an account, development reads the test records in `src/vrchat/fake-reader.ts` and anything else says it cannot read.
 
+## Pictures
+
+VRChat icons and banners are copied, never linked: a public page must not make a request to a VRChat domain, and VRChat's addresses aren't stable. The copies live in Postgres, in `vrchat.images`, so there is no bucket to run, back up or clean separately. `src/vrchat/images.ts` does the work:
+
+- **When.** A claim that matches, and every refresh. Each picture is fetched and re-encoded *before* the snapshot's transaction opens, because a download can take seconds. It is saved inside the transaction, so the picture and the page change together.
+- **Only what's new.** `source_url` remembers the address VRChat gave. A refresh that sees the same address reuses the row and downloads nothing, so pictures cost a download per upload, not per read. They take no slot and spend no budget, but the kill switch, the circuit and a backoff still stop them. Only `*.vrchat.cloud` and `*.vrchat.com` are fetched, since the server sits on a private network, and nothing over 16 MB.
+- **Stored as** WebP, fitted inside 512px (icons) or 1600px (banners), named by the sha256 of those bytes. Two people with the same picture share one row.
+- **Kept when a download fails.** The old picture beats none; a picture VRChat no longer has is removed.
+- **Deleted by the database.** A trigger (`internal.drop_unused_images`, migration `20260929130000`) deletes a picture the moment no user or group uses it, which covers a changed picture, a disconnect, an unclaimed group and a deleted account, whose cascade arrives there too. Users and groups hold their pictures with `ON DELETE RESTRICT`, so nothing can delete one still on a page.
+- **Served** by `GET /v1/images/{sha256 hex}.webp` with a thirty-day `Cache-Control`, and the website serves that at `/images/<file>`. Pages get the relative address, which `next/image` optimizes like any local picture. Thirty days is the spec's limit for a deleted account's pictures leaving every cache. The route is not rate limited: it is one indexed read, and most requests come from the website's optimizer, all from one address.
+
 ## Two database logins, and why readiness checks both
 
 The API signs in to Postgres twice: `DB_API_*` for everything the site renders, and `DB_AUTH_*` for Better Auth, on its own pool. Only the second can sign anybody in.
@@ -200,7 +211,7 @@ That means a wrong `DB_AUTH_PASSWORD` is invisible from the outside. Every page 
 | `RESEND_API_KEY` | No email means no sign-in codes. `VRCPAGE_PRINT_SIGN_IN_CODES=true` is the escape hatch for a local production build |
 | `TURNSTILE_SECRET_KEY` | The bot check fails closed, so every code would be refused |
 
-A missing VRChat account and `IMAGES_BASE_URL` are warnings, not failures: pages still serve from the database, they just stop being refreshed and fall back to their own art.
+A missing VRChat account is a warning, not a failure: pages still serve from the database, they just stop being refreshed.
 
 ## Email
 

@@ -11,6 +11,7 @@
 --   links     L1 ...e2   L2 ...e3   (both on PE)
 --   VRChat    usr_aaaa… = A   usr_eeee… = E   usr_cccc… = I   grp_1111… = A's group
 --             usr_bbbb… banned   usr_dddd… banned then lifted   usr_9999… ban already expired
+--   images    B1 A's icon ...b01   B2 A's group banner ...b02   B3 A's banner and E's icon ...b03
 
 BEGIN;
 
@@ -60,6 +61,17 @@ INSERT INTO vrchat.groups (id, claimed_by_vrchat_user_id, name, short_code, disc
                            owner_vrchat_user_id, fetched_at) VALUES
   ('grp_11111111-1111-4111-8111-111111111111', 'usr_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
    'Night Market', 'NIGHT', '1234', 'default', 'usr_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', now());
+
+INSERT INTO vrchat.images (id, sha256, width, height, byte_size, bytes, source_url) VALUES
+  ('00000000-0000-7000-8000-000000000b01', sha256('icon a'), 1, 1, 1, '', 'https://api.vrchat.cloud/test/b01'),
+  ('00000000-0000-7000-8000-000000000b02', sha256('banner g'), 1, 1, 1, '', 'https://api.vrchat.cloud/test/b02'),
+  ('00000000-0000-7000-8000-000000000b03', sha256('shared'), 1, 1, 1, '', 'https://api.vrchat.cloud/test/b03');
+UPDATE vrchat.users SET icon_image_id = '00000000-0000-7000-8000-000000000b01', banner_image_id = '00000000-0000-7000-8000-000000000b03'
+ WHERE id = 'usr_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+UPDATE vrchat.users SET icon_image_id = '00000000-0000-7000-8000-000000000b03'
+ WHERE id = 'usr_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+UPDATE vrchat.groups SET banner_image_id = '00000000-0000-7000-8000-000000000b02'
+ WHERE id = 'grp_11111111-1111-4111-8111-111111111111';
 
 INSERT INTO pages.pages (id, kind, vrchat_user_id, vrchat_group_id) VALUES
   ('00000000-0000-7000-8000-0000000000a1', 'user',  'usr_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', NULL),
@@ -144,12 +156,28 @@ BEGIN
            WHERE slug_key IN ('atian', 'atianpup', 'nightmarket')
              AND page_id IS NULL
              AND blocked_until > now() + interval '89 days') = 3, 'all three names held for 90 days';
+  ASSERT NOT EXISTS (SELECT 1 FROM vrchat.images
+                      WHERE id IN ('00000000-0000-7000-8000-000000000b01', '00000000-0000-7000-8000-000000000b02')), 'pictures only they used removed';
+  ASSERT EXISTS (SELECT 1 FROM vrchat.images WHERE id = '00000000-0000-7000-8000-000000000b03'), 'a picture someone else uses kept';
   ASSERT EXISTS (SELECT 1 FROM audit.events WHERE action = 'test.fixture'), 'audit event untouched';
   ASSERT EXISTS (SELECT 1 FROM audit.row_changes
                   WHERE schema_name = 'auth' AND table_name = 'accounts' AND operation = 'delete'
                     AND row_key = '{"id": "00000000-0000-7000-8000-00000000000a"}'
                     AND db_role = 'vrcpage_auth'), 'deletion recorded with the real login';
   RAISE NOTICE 'ok    account deletion cascades, holds names, keeps logs';
+END
+$$;
+
+-- A picture goes with its last use, and nobody can delete one still in use.
+SET SESSION AUTHORIZATION vrcpage_api;
+SELECT internal.test_rejects($$DELETE FROM vrchat.images WHERE id = '00000000-0000-7000-8000-000000000b03'$$, 'API deletes a picture in use');
+UPDATE vrchat.users SET icon_image_id = NULL WHERE id = 'usr_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+RESET SESSION AUTHORIZATION;
+
+DO $$
+BEGIN
+  ASSERT NOT EXISTS (SELECT 1 FROM vrchat.images WHERE id = '00000000-0000-7000-8000-000000000b03'), 'picture removed with its last use';
+  RAISE NOTICE 'ok    pictures go with their last use';
 END
 $$;
 
