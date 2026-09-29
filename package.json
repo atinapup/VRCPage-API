@@ -20,10 +20,12 @@
     "db:status": "node scripts/db.mjs status",
     "db:test": "node scripts/db.mjs test",
     "db:maintain": "node scripts/db.mjs maintain",
+    "db:grant-admin": "node scripts/db.mjs grant-admin",
     "db:bootstrap:prod": "node scripts/db.mjs bootstrap --prod",
     "db:migrate:prod": "node scripts/db.mjs migrate --prod",
     "db:status:prod": "node scripts/db.mjs status --prod",
-    "db:maintain:prod": "node scripts/db.mjs maintain --prod"
+    "db:maintain:prod": "node scripts/db.mjs maintain --prod",
+    "db:grant-admin:prod": "node scripts/db.mjs grant-admin --prod"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.3",

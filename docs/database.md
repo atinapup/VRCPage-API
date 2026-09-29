@@ -227,12 +227,13 @@ Do not set `usePlural`. Better Auth checks the schema at start-up, and that chec
 ## Names and aliases
 
 `pages.slugs` is the single pool of names. `slug_key` (lowercase) is the primary key, so users, groups, aliases and held names can never collide, whatever the capitals.
-- **Primary:** each page has at most one. An **alias** redirects (308) to it.
-- **Who gets aliases:** holders of `moderator` or `partner` can have up to `slug.aliases.max_per_page` (5) per page. Admins are unlimited.
+- **Primary:** each page has at most one. An **alias** is another name for the same page. With `is_redirect` (the default) it redirects (308) to the primary; without it, it shows the page at the alias itself. Only aliases read `is_redirect`.
+- **Who gets aliases:** admins add them to any page, with no limit. `slug.aliases.max_per_page` (5) is for when `moderator` and `partner` holders get their own, which isn't built yet.
 - **Renaming:**
   - A real rename turns the old row into a hold and inserts a new primary.
   - A change of capitals only updates `slug`.
-  - Reclaiming an expired hold is an UPDATE of that row. Nightly maintenance deletes holds that have expired.
+  - Reclaiming an expired hold is an UPDATE of that row, as is an alias becoming the primary. Nightly maintenance deletes holds that have expired.
+  - An admin may reclaim a hold before it expires, and is not held to the rename cooldown.
 - **API checks:** reserved words, blocked substrings, lengths and caps are checked against config.
 
 ## Retention and maintenance

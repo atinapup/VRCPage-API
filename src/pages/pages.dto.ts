@@ -99,8 +99,10 @@ export class PublicPage {
   kind!: 'user' | 'group';
   /** The page's own name, as its owner typed it. */
   slug!: string;
-  /** The name asked for is an alias: redirect (308) to `slug`. */
+  /** The name asked for is an alias of `slug`. */
   alias!: boolean;
+  /** An alias that sends the visitor on to `slug` (308). False for the page's own name, and for an alias that shows the page at itself. */
+  redirect!: boolean;
   @ApiProperty({ type: UserPage, required: false })
   user?: UserPage;
   @ApiProperty({ type: GroupPage, required: false })
@@ -132,6 +134,9 @@ export class DashboardPage {
 
 /** Everything the dashboard's frame shows about the signed-in account. */
 export class Dashboard {
+  /** Staff roles this account holds. An admin may run every page, with no waits. */
+  @ApiProperty({ enum: ['admin', 'moderator', 'partner'], isArray: true })
+  roles!: Array<'admin' | 'moderator' | 'partner'>;
   @ApiProperty({ type: DashboardPage, nullable: true })
   user!: DashboardPage | null;
   /** Owned groups first, then the ones this account edits. */

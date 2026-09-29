@@ -100,6 +100,10 @@ Until the rate-limited VRChat client exists, development reads the stand-in reco
 
 `PUT /v1/me/pages/{pageId}/name` is owners only. The first name is free; a change starts the `slug.change_cooldown_days` clock and puts the name it replaced into a hold, so nobody can pick it up to pass as its old owner. Changing only the capitals keeps the same name and costs nothing.
 
+An admin has no cooldown, and may also take a name that is held, too short, or looks like VRChat's own. `GET /v1/me/names/{name}` answers an admin by the same rules, so the field and the save agree. Reserved names stay refused for everyone: they are the website's own routes.
+
+An **alias** is another name for a page. `GET /v1/pages/{slug}` answers one with `alias: true`, and with `redirect` saying what to do with it: true sends the visitor on to `slug` (308), false shows the page at the alias, with the address left as typed. The page's canonical address is its own name either way. Only admins add, change or remove aliases (`/v1/admin/pages/{pageId}/aliases`), and a removed alias is held like any released name.
+
 ## Refreshing from VRChat
 
 `POST /v1/me/pages/{pageId}/refresh` reads a page again now, rather than waiting for its turn (spec section 3). Every VRChat read is a row in `vrchat.jobs`, so a manual refresh is a job in the `manual` lane, and that table is what the limits count:
@@ -108,6 +112,7 @@ Until the rate-limited VRChat client exists, development reads the stand-in reco
 - **Owners only** while `refresh.manual.owner_only` is on.
 - **Only one open job per page**, so two quick presses can't both go out.
 - **A read VRChat failed counts towards neither**, the same as a claim check: it said nothing about the page.
+- **An admin skips the page's wait, the daily cap and the owner-only rule**, on any page. VRChat's own turn, once a minute for the whole site, still applies to them: it protects the account every read is made with.
 
 A group is only ever published for its owner, and never while private, so a refresh that finds either has changed acts on it: a group handed to someone else is unclaimed (`group_unclaimed`; the database takes its page, links and editors, and holds the name), and one made private becomes private here too. VRChat no longer having the account or group is `vrchat_gone`.
 
@@ -130,6 +135,24 @@ A page shows VRChat's links first, then the ones added on vrc.page. `PUT /v1/me/
 - **The same link twice is refused**, by one identity rule: the host with or without www, the path with or without a trailing slash, and the query.
 - **A row keeps its id while its address stays the same**, so a reorder or a new label is an update, and only a link that really came or went is recorded as `link_item.added` or `link_item.removed`.
 - Limits come from `links.custom.*`: 8 links, 40-character labels, and a switch to turn adding off.
+
+## Admin
+
+An account with the `admin` role in `auth.account_roles` may run every page and every account. There are two halves to that:
+
+- **Everything an owner can change on a page, an admin changes through the owner's own endpoints.** `PagesService.role()` answers `admin` for them on every page, their own included, and every owner-only check refuses only an `editor`. So a page's name, visibility, links, refresh and editors are one set of endpoints and rules, with no second copy to drift. An admin's own pages carry `nameChangeableAt` and `refreshableAt` as null.
+- **What only staff can do is under `/v1/admin`**, behind `SessionGuard` and then `AdminGuard`. Anyone signed in who isn't an admin gets a plain 404, the same as a route that doesn't exist. Every write there runs as a `staff` actor, so row history and `audit.events` (actions named `admin.*`, kept as security events) both say which admin did it.
+
+What's there:
+- **Accounts:** list and search them, change an email address or name, grant and revoke roles, end every session, disconnect VRChat, and delete an account.
+- **Pages:** list and search them, take one down and put it back, and add, change or remove aliases.
+
+Some changes need rules of their own:
+- **Email and name** go through Better Auth's `internalAdapter`, because the auth login owns `auth.accounts`. A new address sends the old one the same `email_changed` mail an owner's own change does.
+- **Nobody can take away their own admin role**, or delete their own account from here (that is Settings), so an admin can't lock themselves out.
+- **A page taken down** answers exactly like a missing one, and its owner can't undo it.
+
+**The first admin** has nobody to grant it, so it comes from the database: `npm run db:grant-admin -- <email>` (or `db:grant-admin:prod`). Its account must have signed in once. Every admin after that is granted from the website.
 
 ### Refusals a client can act on
 
@@ -274,9 +297,21 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `DELETE /v1/me/groups/{pageId}/editors/{id}` | Take a row off that list: revoked, removed, or left |
 | `GET /v1/me/pages/{pageId}/links` | The page's own links, in order, with the limits that apply |
 | `PUT /v1/me/pages/{pageId}/links` | Replace them with this ordered list. Owners and editors |
-| `POST /v1/me/pages/{pageId}/refresh` | Read it again from VRChat now. Owners only, with a wait between and a daily limit |
+| `POST /v1/me/pages/{pageId}/refresh` | Read it again from VRChat now. Owners only, with a wait between and a daily limit; admins skip both |
 | `GET /v1/me/names/{name}` | Whether a name can be used, with `pageId` for the page asking |
 | `PUT /v1/me/pages/{pageId}/name` | Give a page its name, or change it |
+| `GET /v1/admin/accounts` | Admins: accounts, newest first, 50 at a time (`q` searches, `before` pages) |
+| `GET /v1/admin/accounts/{accountId}` | Admins: one account's details, roles, sign-ins, sessions, VRChat user and pages |
+| `PATCH /v1/admin/accounts/{accountId}` | Admins: change its email address or name |
+| `PUT`, `DELETE /v1/admin/accounts/{accountId}/roles/{role}` | Admins: grant or revoke `admin`, `moderator` or `partner` |
+| `DELETE /v1/admin/accounts/{accountId}/sessions` | Admins: sign it out everywhere |
+| `DELETE /v1/admin/accounts/{accountId}/vrchat` | Admins: disconnect its VRChat account |
+| `DELETE /v1/admin/accounts/{accountId}` | Admins: delete it and everything it owns |
+| `GET /v1/admin/pages` | Admins: every page, whatever its visibility, 50 at a time |
+| `GET /v1/admin/pages/{pageId}` | Admins: one page with its owner, aliases and takedown |
+| `PUT`, `DELETE /v1/admin/pages/{pageId}/hidden` | Admins: take it down with a reason, or put it back |
+| `POST /v1/admin/pages/{pageId}/aliases` | Admins: give it another name, which redirects or shows the page |
+| `PATCH`, `DELETE /v1/admin/pages/{pageId}/aliases/{name}` | Admins: flip an alias's redirect, or remove it |
 | `POST /v1/webhooks/resend` | Resend's delivery events. Signed; not in `openapi.json` |
 | `GET /v1/dev/codes` | Development only: the codes printed to this terminal |
 | `GET /v1/dev/vrchat/world`, `PUT /v1/dev/vrchat/...` | Development only: read and edit the stand-in VRChat, including the bios and descriptions a code is pasted into |
@@ -298,6 +333,7 @@ src/
   auth/                   Better Auth, the /v1/auth endpoints, the session guard, Turnstile
   mail/                   templates, the outbox and its drainer, Resend, and the signed webhook
   pages/                  public pages, the signed-in account's own, and names (/v1/pages, /v1/me)
+  admin/                  staff tools for any account and page (/v1/admin), behind AdminGuard
   vrchat/                 the reader seam, the stand-in records, and claim codes
   dev/                    development-only test data and shortcuts
   health/                 liveness and readiness

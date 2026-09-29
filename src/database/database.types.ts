@@ -456,12 +456,16 @@ export interface PagesSlugs {
   claimedAt: Generated<Timestamp>;
   createdAt: Generated<Timestamp>;
   /**
+   * Aliases only: true sends a 308 to the primary, false serves the page at this name.
+   */
+  isRedirect: Generated<boolean>;
+  /**
    * NULL while the name is held after release. Reclaiming an expired hold updates this row.
    */
   pageId: string | null;
   releasedAt: Timestamp | null;
   /**
-   * primary: the page's address. alias: redirects (308) to the primary.
+   * primary: the page's address. alias: another name for it, which redirects (308) to the primary unless is_redirect is false.
    */
   role: PagesSlugRole;
   /**

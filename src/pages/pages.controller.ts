@@ -134,8 +134,8 @@ export class MeController {
    */
   @Get('names/:name')
   @RateLimit('names', 30, 60)
-  nameAvailability(@Param('name') name: string, @Query('pageId') pageId?: string): Promise<NameAvailability> {
-    return this.pages.nameAvailability(name, pageId && UUID.test(pageId) ? pageId : null);
+  async nameAvailability(@CurrentViewer() viewer: Viewer, @Param('name') name: string, @Query('pageId') pageId?: string): Promise<NameAvailability> {
+    return this.pages.nameAvailability(name, pageId && UUID.test(pageId) ? pageId : null, await this.pages.isAdmin(viewer.accountId));
   }
 
   /**

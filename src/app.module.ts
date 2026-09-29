@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { AdminModule } from './admin/admin.module.js';
 import { AuditModule } from './audit/audit.js';
 import { AuthModule } from './auth/auth.module.js';
 import { RateLimitGuard } from './common/rate-limit.js';
@@ -21,6 +22,7 @@ import { VRChatModule } from './vrchat/vrchat.module.js';
     AuthModule,
     HealthModule,
     PagesModule,
+    AdminModule,
     VRChatModule,
     // Test-data shortcuts. Never registered in production, so those routes don't exist there.
     ...(environment === 'development' ? [DevModule] : []),

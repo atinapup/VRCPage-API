@@ -68,22 +68,27 @@ export class RefreshService {
     const settings = await this.settings();
     const role = await this.pages.role(this.db, accountId, pageId);
     if (!role) return { status: 'not_found' };
-    if (role !== 'owner' && settings.ownerOnly) return { status: 'not_allowed' };
+    if (role === 'editor' && settings.ownerOnly) return { status: 'not_allowed' };
 
-    const waitUntil = await this.pages.refreshableAt(pageId);
-    if (waitUntil) return { status: 'cooldown', wait: Math.max(1, Math.ceil((Date.parse(waitUntil) - Date.now()) / 1000)) };
+    // An admin skips the page's wait and the daily cap. VRChat's own turn
+    // (once a minute, site-wide) still applies below: it protects the account
+    // every read is made with.
+    if (role !== 'admin') {
+      const waitUntil = await this.pages.refreshableAt(pageId);
+      if (waitUntil) return { status: 'cooldown', wait: Math.max(1, Math.ceil((Date.parse(waitUntil) - Date.now()) / 1000)) };
 
-    const midnight = new Date();
-    midnight.setUTCHours(0, 0, 0, 0);
-    const today = await this.db
-      .selectFrom('vrchat.jobs')
-      .select((eb) => eb.fn.countAll<number>().as('count'))
-      .where('requestedBy', '=', accountId)
-      .where('lane', '=', 'manual')
-      .where('status', '!=', 'failed')
-      .where('createdAt', '>=', midnight)
-      .executeTakeFirstOrThrow();
-    if (Number(today.count) >= settings.dailyCap) return { status: 'daily_limit', cap: settings.dailyCap };
+      const midnight = new Date();
+      midnight.setUTCHours(0, 0, 0, 0);
+      const today = await this.db
+        .selectFrom('vrchat.jobs')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
+        .where('requestedBy', '=', accountId)
+        .where('lane', '=', 'manual')
+        .where('status', '!=', 'failed')
+        .where('createdAt', '>=', midnight)
+        .executeTakeFirstOrThrow();
+      if (Number(today.count) >= settings.dailyCap) return { status: 'daily_limit', cap: settings.dailyCap };
+    }
 
     const page = await this.db
       .selectFrom('pages.pages as p')
@@ -110,7 +115,8 @@ export class RefreshService {
         .executeTakeFirstOrThrow();
       jobId = job.id;
     } catch (error) {
-      if ((error as { code?: string }).code === UNIQUE_VIOLATION) return { status: 'cooldown', wait: settings.cooldownSeconds };
+      // Another press is being read right now. An admin's wait is for that read, not the page's cooldown.
+      if ((error as { code?: string }).code === UNIQUE_VIOLATION) return { status: 'cooldown', wait: role === 'admin' ? 60 : settings.cooldownSeconds };
       throw error;
     }
 

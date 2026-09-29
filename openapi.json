@@ -1533,6 +1533,620 @@
         ]
       }
     },
+    "/v1/admin/accounts": {
+      "get": {
+        "operationId": "adminAccounts",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccountList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/accounts/{accountId}": {
+      "get": {
+        "operationId": "adminAccount",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One account: its details, roles, sign-ins, sessions, VRChat user and pages.",
+        "tags": [
+          "admin"
+        ]
+      },
+      "patch": {
+        "operationId": "adminUpdateAccount",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminAccountPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change an account's email address or name. The old address is told about a new one.",
+        "tags": [
+          "admin"
+        ]
+      },
+      "delete": {
+        "operationId": "adminDeleteAccount",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete an account and everything it owns. Your own is deleted from Settings.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/accounts/{accountId}/roles/{role}": {
+      "put": {
+        "operationId": "adminGrantRole",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Grant a staff role.",
+        "tags": [
+          "admin"
+        ]
+      },
+      "delete": {
+        "operationId": "adminRevokeRole",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revoke a staff role. An admin can't take away their own admin role, so nobody locks themselves out.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/accounts/{accountId}/sessions": {
+      "delete": {
+        "operationId": "adminSignOutEverywhere",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "End every session the account has.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/accounts/{accountId}/vrchat": {
+      "delete": {
+        "operationId": "adminDisconnectVRChat",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Disconnect its VRChat account, which takes its page and groups with it.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/pages": {
+      "get": {
+        "operationId": "adminPages",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPageList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/pages/{pageId}": {
+      "get": {
+        "operationId": "adminPage",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One page, whatever its visibility, with its owner, aliases and takedown.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/pages/{pageId}/hidden": {
+      "put": {
+        "operationId": "adminHide",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HideRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Take a page down. It answers like a missing page until it is restored, and its owner can't undo it.",
+        "tags": [
+          "admin"
+        ]
+      },
+      "delete": {
+        "operationId": "adminRestore",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Put a page taken down back up.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/pages/{pageId}/aliases": {
+      "post": {
+        "operationId": "adminAddAlias",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AliasRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Give a page another name. By default it redirects (308) to the page's own name.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/pages/{pageId}/aliases/{name}": {
+      "patch": {
+        "operationId": "adminSetAlias",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AliasPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Whether an alias redirects to the page's own name, or shows the page at itself.",
+        "tags": [
+          "admin"
+        ]
+      },
+      "delete": {
+        "operationId": "adminRemoveAlias",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Take an alias off a page. The name is held like any released name.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/v1/dev/vrchat/world": {
       "get": {
         "operationId": "devWorld",
@@ -2412,13 +3026,18 @@
           },
           "alias": {
             "type": "boolean",
-            "description": "The name asked for is an alias: redirect (308) to `slug`."
+            "description": "The name asked for is an alias of `slug`."
+          },
+          "redirect": {
+            "type": "boolean",
+            "description": "An alias that sends the visitor on to `slug` (308). False for the page's own name, and for an alias that shows the page at itself."
           }
         },
         "required": [
           "kind",
           "slug",
-          "alias"
+          "alias",
+          "redirect"
         ]
       },
       "DashboardPage": {
@@ -2487,6 +3106,18 @@
       "Dashboard": {
         "type": "object",
         "properties": {
+          "roles": {
+            "type": "array",
+            "description": "Staff roles this account holds. An admin may run every page, with no waits.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "moderator",
+                "partner"
+              ]
+            }
+          },
           "user": {
             "nullable": true,
             "type": "object",
@@ -2512,6 +3143,7 @@
           }
         },
         "required": [
+          "roles",
           "user",
           "groupClaimsLeft",
           "pendingInvites",
@@ -3005,6 +3637,441 @@
         },
         "required": [
           "status"
+        ]
+      },
+      "AdminAccountRow": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "moderator",
+                "partner"
+              ]
+            }
+          },
+          "vrchatName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The connected VRChat account's display name, or null before one is connected."
+          },
+          "vrchatId": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "pageId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Its own page's id and name, when it has one."
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "groups": {
+            "type": "integer",
+            "description": "Groups it owns."
+          },
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it signed up: ISO 8601."
+          }
+        },
+        "required": [
+          "roles",
+          "vrchatName",
+          "vrchatId",
+          "avatarUrl",
+          "pageId",
+          "slug",
+          "groups",
+          "id",
+          "email",
+          "createdAt"
+        ]
+      },
+      "AdminAccountList": {
+        "type": "object",
+        "properties": {
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pass as `before` for the next, older, page of results; null at the end."
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAccountRow"
+            }
+          }
+        },
+        "required": [
+          "next",
+          "accounts"
+        ]
+      },
+      "AdminVRChatUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "connectedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "connectedAt"
+        ]
+      },
+      "AdminSession": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ip",
+          "userAgent",
+          "id",
+          "createdAt",
+          "expiresAt"
+        ]
+      },
+      "AdminPageRow": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "visibility": {
+            "enum": [
+              "public",
+              "unlisted",
+              "private"
+            ],
+            "type": "string"
+          },
+          "iconUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "The VRChat display name or group name."
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "Taken down by staff."
+          },
+          "vrchatId": {
+            "type": "string"
+          },
+          "ownerAccountId": {
+            "type": "string"
+          },
+          "ownerEmail": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "slug",
+          "visibility",
+          "iconUrl",
+          "id",
+          "name",
+          "hidden",
+          "vrchatId",
+          "ownerAccountId",
+          "ownerEmail",
+          "createdAt"
+        ]
+      },
+      "AdminAccount": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "moderator",
+                "partner"
+              ]
+            }
+          },
+          "vrchat": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AdminVRChatUser"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "Can be empty: an email sign-up has no name."
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "providers": {
+            "description": "Discord and GitHub, when connected.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sessions": {
+            "description": "Sessions that haven't expired, newest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminSession"
+            }
+          },
+          "pages": {
+            "description": "Its own page, then the groups it owns.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPageRow"
+            }
+          },
+          "editing": {
+            "description": "Groups it helps run as an editor.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPageRow"
+            }
+          }
+        },
+        "required": [
+          "roles",
+          "vrchat",
+          "id",
+          "email",
+          "name",
+          "emailVerified",
+          "createdAt",
+          "providers",
+          "sessions",
+          "pages",
+          "editing"
+        ]
+      },
+      "AdminAccountPatch": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "Up to 200 characters. Empty clears it."
+          }
+        }
+      },
+      "AdminPageList": {
+        "type": "object",
+        "properties": {
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pass as `before` for the next, older, page of results; null at the end."
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPageRow"
+            }
+          }
+        },
+        "required": [
+          "next",
+          "pages"
+        ]
+      },
+      "AdminHidden": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "reason"
+        ]
+      },
+      "AdminAlias": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "The name, as typed."
+          },
+          "redirect": {
+            "type": "boolean",
+            "description": "True sends the visitor on to the page's own name; false shows the page here."
+          }
+        },
+        "required": [
+          "slug",
+          "redirect"
+        ]
+      },
+      "AdminPage": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "hidden": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AdminHidden"
+              }
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserPage"
+          },
+          "group": {
+            "$ref": "#/components/schemas/GroupPage"
+          },
+          "pageId": {
+            "type": "string"
+          },
+          "ownerAccountId": {
+            "type": "string"
+          },
+          "ownerEmail": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAlias"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "slug",
+          "hidden",
+          "pageId",
+          "ownerAccountId",
+          "ownerEmail",
+          "aliases"
+        ]
+      },
+      "HideRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Why, for staff. Up to 1000 characters."
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "AliasRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "redirect": {
+            "type": "boolean",
+            "description": "Defaults to true: the alias sends visitors on to the page's own name."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "AliasPatch": {
+        "type": "object",
+        "properties": {
+          "redirect": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "redirect"
         ]
       },
       "FakeUserView": {

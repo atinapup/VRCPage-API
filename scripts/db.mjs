@@ -8,6 +8,7 @@
 //   npm run db:test        run db/tests/invariants.sql, rolled back (development only)
 //   npm run db:maintain    run the nightly maintenance once, by hand
 //   npm run db:types       generate the API's Kysely types from the database (development only)
+//   npm run db:grant-admin -- <email>   make that account an admin; the rest are granted in the website
 //
 // Each has a :prod twin (db:migrate:prod, ...) except the development-only ones.
 import { spawnSync } from 'node:child_process';
@@ -239,8 +240,28 @@ async function maintain() {
   });
 }
 
+// The first admin has nobody to grant it, so it is granted here, as the
+// migrator. Every admin after that is granted from the website.
+async function grantAdmin() {
+  const email = flags.find((flag) => !flag.startsWith('--'))?.trim().toLowerCase();
+  if (!email) throw new Error('Usage: npm run db:grant-admin -- <email>');
+  await withClient(connection('migrator'), async (db) => {
+    const { rows } = await db.query(
+      `INSERT INTO auth.account_roles (account_id, role, note)
+       SELECT id, 'admin', 'granted with db:grant-admin' FROM auth.accounts WHERE email = $1
+       ON CONFLICT DO NOTHING
+       RETURNING account_id`,
+      [email],
+    );
+    const exists = rows.length > 0 || (await db.query('SELECT 1 FROM auth.accounts WHERE email = $1', [email])).rowCount > 0;
+    if (!exists) throw new Error(`No account signs in with ${email}. Sign in on the website once, then run this again.`);
+    console.log(rows.length > 0 ? `${email} is an admin now.` : `${email} was an admin already.`);
+  });
+}
+
 const commands = {
   bootstrap,
+  'grant-admin': grantAdmin,
   migrate,
   rollback: async () => dbmate('rollback'),
   status: async () => dbmate('status'),

@@ -99,7 +99,7 @@ export class EditorsService {
   async list(accountId: string, pageId: string): Promise<GroupEditors | 'not_found' | 'not_allowed'> {
     const role = await this.pages.role(this.db, accountId, pageId);
     if (!role) return 'not_found';
-    if (role !== 'owner') return 'not_allowed';
+    if (role === 'editor') return 'not_allowed';
 
     const seats = await this.db.selectFrom('pages.editors').select(['accountId', 'addedAt']).where('pageId', '=', pageId).orderBy('addedAt').execute();
     const waiting = await this.db
@@ -127,7 +127,7 @@ export class EditorsService {
     return this.db.write({ requestId: context.requestId, type: 'account', accountId }, async (trx) => {
       const role = await this.pages.role(trx, accountId, pageId);
       if (!role) return { status: 'not_found' as const };
-      if (role !== 'owner') return { status: 'not_allowed' as const };
+      if (role === 'editor') return { status: 'not_allowed' as const };
 
       // The name is how people know each other here, so it is what an
       // invitation is addressed to. Only a person's page has somebody behind it.
@@ -268,7 +268,7 @@ export class EditorsService {
       const role = await this.pages.role(trx, accountId, pageId);
       if (!role) return { status: 'not_found' as const };
       const leaving = id === accountId;
-      if (role !== 'owner' && !leaving) return { status: 'not_allowed' as const };
+      if (role === 'editor' && !leaving) return { status: 'not_allowed' as const };
 
       if (!leaving) {
         const invite = await trx

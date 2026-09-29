@@ -26,7 +26,7 @@ export type CookieHeaders = Headers | null;
 /** A pending sign-in: the token for the code step, whether a new code went out, and the wait before another. */
 export type PendingCode = { pendingToken: string; sent: boolean; resendIn: number };
 
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function normalize(email: string): string {
   return email.trim().toLowerCase();
@@ -38,7 +38,7 @@ function addressId(email: string): string {
 }
 
 /** "someone@example.com" as "s•••@example.com", for telling one address about another. */
-function mask(email: string): string {
+export function mask(email: string): string {
   const at = email.lastIndexOf('@');
   return `${email.slice(0, 1)}•••${email.slice(at)}`;
 }

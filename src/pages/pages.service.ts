@@ -26,8 +26,14 @@ type Visibility = UserPage['visibility'];
 /** VRChat's links are VRChat's to moderate; ours alone go through links.custom.blocked_hosts. */
 const NOTHING_BLOCKED: ReadonlySet<string> = new Set();
 
-/** What an account may do with a page. Anything else is not its page at all. */
-export type PageRole = 'owner' | 'editor';
+/**
+ * What an account may do with a page. Anything else is not its page at all.
+ * An admin may do everything an owner may, on every page, with no waits.
+ */
+export type PageRole = 'owner' | 'editor' | 'admin';
+
+/** Staff roles, from auth.account_roles. */
+export type AccountRole = 'admin' | 'moderator' | 'partner';
 
 /** What giving a page a name can answer. */
 export type SetNameResult =
@@ -52,7 +58,8 @@ export class PagesService {
    * This account's standing on a page, from the database rather than anything
    * the caller said: it owns its own page through the VRChat connection, owns
    * a group through the connection that claimed it, and edits one by its seat.
-   * Null for every other page, including ones that don't exist.
+   * Null for every other page, including ones that don't exist. An admin is
+   * 'admin' on every page, its own included, so its exemptions follow it.
    */
   async role(executor: Kysely<DB>, accountId: string, pageId: string): Promise<PageRole | null> {
     const row = await executor
@@ -61,16 +68,29 @@ export class PagesService {
       .leftJoin('vrchat.groups as g', 'g.id', 'p.vrchatGroupId')
       .leftJoin('vrchat.users as claimer', 'claimer.id', 'g.claimedByVrchatUserId')
       .leftJoin('pages.editors as e', (join) => join.onRef('e.pageId', '=', 'p.id').on('e.accountId', '=', accountId))
+      .leftJoin('auth.accountRoles as r', (join) => join.on('r.accountId', '=', accountId).on('r.role', '=', 'admin'))
       .select((eb) => [
         eb('u.accountId', '=', accountId).as('ownsUserPage'),
         eb('claimer.accountId', '=', accountId).as('ownsGroup'),
         eb('e.accountId', 'is not', null).as('edits'),
+        eb('r.accountId', 'is not', null).as('admin'),
       ])
       .where('p.id', '=', pageId)
       .executeTakeFirst();
     if (!row) return null;
+    if (row.admin) return 'admin';
     if (row.ownsUserPage || row.ownsGroup) return 'owner';
     return row.edits ? 'editor' : null;
+  }
+
+  /** The staff roles this account holds. */
+  async roles(accountId: string): Promise<AccountRole[]> {
+    const rows = await this.db.selectFrom('auth.accountRoles').select('role').where('accountId', '=', accountId).orderBy('role').execute();
+    return rows.map((row) => row.role);
+  }
+
+  async isAdmin(accountId: string): Promise<boolean> {
+    return (await this.roles(accountId)).includes('admin');
   }
 
   private async primarySlug(pageId: string): Promise<string | null> {
@@ -113,7 +133,7 @@ export class PagesService {
     ];
   }
 
-  private async userPage(pageId: string): Promise<UserPage | null> {
+  async userPage(pageId: string): Promise<UserPage | null> {
     const row = await this.db
       .selectFrom('pages.pages as p')
       .innerJoin('vrchat.users as u', 'u.id', 'p.vrchatUserId')
@@ -165,7 +185,7 @@ export class PagesService {
     };
   }
 
-  private async groupPage(pageId: string): Promise<GroupPage | null> {
+  async groupPage(pageId: string): Promise<GroupPage | null> {
     const row = await this.db
       .selectFrom('pages.pages as p')
       .innerJoin('vrchat.groups as g', 'g.id', 'p.vrchatGroupId')
@@ -227,7 +247,7 @@ export class PagesService {
     const found = await this.db
       .selectFrom('pages.slugs as s')
       .innerJoin('pages.pages as p', 'p.id', 's.pageId')
-      .select(['p.id', 'p.kind', 'p.visibility', 'p.hiddenAt', 's.role'])
+      .select(['p.id', 'p.kind', 'p.visibility', 'p.hiddenAt', 's.role', 's.isRedirect'])
       .where('s.slugKey', '=', slug.toLowerCase())
       .executeTakeFirst();
     if (!found || found.visibility === 'private' || found.hiddenAt !== null) return null;
@@ -235,13 +255,14 @@ export class PagesService {
     const primary = await this.primarySlug(found.id);
     if (!primary) return null;
     const alias = found.role === 'alias';
+    const redirect = alias && found.isRedirect;
 
     if (found.kind === 'user') {
       const user = await this.userPage(found.id);
-      return user ? { kind: 'user', slug: primary, alias, user } : null;
+      return user ? { kind: 'user', slug: primary, alias, redirect, user } : null;
     }
     const group = await this.groupPage(found.id);
-    return group ? { kind: 'group', slug: primary, alias, group } : null;
+    return group ? { kind: 'group', slug: primary, alias, redirect, group } : null;
   }
 
   /* The signed-in account's own pages ------------------------------------- */
@@ -260,7 +281,7 @@ export class PagesService {
     const row = await this.ownUserPageRow(accountId);
     if (!row) return null;
     const page = await this.userPage(row.id);
-    return page ? { pageId: row.id, slug: await this.primarySlug(row.id), ...(await this.waits(row.id)), page } : null;
+    return page ? { pageId: row.id, slug: await this.primarySlug(row.id), ...(await this.waits(accountId, row.id)), page } : null;
   }
 
   /**
@@ -286,9 +307,10 @@ export class PagesService {
 
   /**
    * When the page's name and a manual refresh are next allowed, said up front
-   * so a screen never offers something only to refuse it.
+   * so a screen never offers something only to refuse it. An admin never waits.
    */
-  private async waits(pageId: string): Promise<{ nameChangeableAt: string | null; refreshableAt: string | null }> {
+  private async waits(accountId: string, pageId: string): Promise<{ nameChangeableAt: string | null; refreshableAt: string | null }> {
+    if (await this.isAdmin(accountId)) return { nameChangeableAt: null, refreshableAt: null };
     const cooldownDays = await this.db.setting<number>('slug.change_cooldown_days');
     const page = await this.db.selectFrom('pages.pages').select('slugChangedAt').where('id', '=', pageId).executeTakeFirstOrThrow();
     return { nameChangeableAt: this.nextRename(page.slugChangedAt, cooldownDays), refreshableAt: await this.refreshableAt(pageId) };
@@ -318,7 +340,7 @@ export class PagesService {
     const role = (await this.groupRoles(accountId)).find((entry) => entry.pageId === pageId)?.role;
     if (!role) return null;
     const page = await this.groupPage(pageId);
-    return page ? { pageId, slug: await this.primarySlug(pageId), role, ...(await this.waits(pageId)), page } : null;
+    return page ? { pageId, slug: await this.primarySlug(pageId), role, ...(await this.waits(accountId, pageId)), page } : null;
   }
 
   async dashboard(accountId: string): Promise<Dashboard> {
@@ -352,6 +374,7 @@ export class PagesService {
       .executeTakeFirstOrThrow();
 
     return {
+      roles: await this.roles(accountId),
       user: own
         ? {
             id: own.pageId,
@@ -394,7 +417,7 @@ export class PagesService {
     return this.db.write({ requestId: context.requestId, type: 'account', accountId }, async (trx) => {
       const role = await this.role(trx, accountId, pageId);
       if (!role) return 'not_found';
-      if (role !== 'owner') return 'not_allowed';
+      if (role === 'editor') return 'not_allowed';
 
       const page = await trx.updateTable('pages.pages').set({ visibility }).where('id', '=', pageId).returning('kind').executeTakeFirstOrThrow();
       await this.audit.record(
@@ -479,23 +502,57 @@ export class PagesService {
    * "held" is kept apart from "taken" for this layer's honesty. A screen may
    * word them alike: saying a name was recently given up tells a stranger
    * something about whoever gave it up.
+   *
+   * An admin may also take a short name, one that looks like impersonation,
+   * or one still held. Reserved names stay refused: they are the site's own
+   * routes, so a page there would never be reached.
    */
-  async nameAvailability(name: string, pageId: string | null = null): Promise<NameAvailability> {
+  async nameAvailability(name: string, pageId: string | null = null, admin = false): Promise<NameAvailability> {
     const settings = await this.nameSettings();
     const trimmed = name.trim();
     const key = trimmed.toLowerCase();
-    const shape = { minLength: settings.minLength, maxLength: settings.maxLength };
+    const shape = { minLength: admin ? 1 : settings.minLength, maxLength: settings.maxLength };
 
-    if (trimmed.length < settings.minLength) return { status: 'too_short', ...shape };
+    if (trimmed.length < shape.minLength) return { status: 'too_short', ...shape };
     if (trimmed.length > settings.maxLength) return { status: 'too_long', ...shape };
     if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) return { status: 'invalid', ...shape };
     if (settings.reserved.includes(key)) return { status: 'reserved', ...shape };
-    if (settings.blocked.some((word) => key.includes(word.toLowerCase()))) return { status: 'impersonation', ...shape };
+    if (!admin && settings.blocked.some((word) => key.includes(word.toLowerCase()))) return { status: 'impersonation', ...shape };
 
     const row = await this.db.selectFrom('pages.slugs').select(['pageId', 'blockedUntil']).where('slugKey', '=', key).executeTakeFirst();
     if (!row) return { status: 'available', ...shape };
     if (row.pageId) return { status: row.pageId === pageId ? 'yours' : 'taken', ...shape };
-    return row.blockedUntil && row.blockedUntil.getTime() > Date.now() ? { status: 'held', ...shape } : { status: 'available', ...shape };
+    const held = !admin && row.blockedUntil !== null && row.blockedUntil.getTime() > Date.now();
+    return { status: held ? 'held' : 'available', ...shape };
+  }
+
+  /**
+   * Put a name on a page, as its primary or as an alias. A name used before
+   * is a row already (the name is the key), whether it is held or is one of
+   * this page's aliases, so taking it updates that row. The caller has
+   * checked that the name is free.
+   */
+  async takeName(trx: Kysely<DB>, pageId: string, slug: string, role: 'primary' | 'alias', isRedirect = true): Promise<void> {
+    const key = slug.toLowerCase();
+    const existing = await trx.selectFrom('pages.slugs').select('slugKey').where('slugKey', '=', key).executeTakeFirst();
+    if (existing) {
+      await trx
+        .updateTable('pages.slugs')
+        .set({ slug, pageId, role, isRedirect, claimedAt: new Date(), releasedAt: null, blockedUntil: null })
+        .where('slugKey', '=', key)
+        .execute();
+    } else {
+      await trx.insertInto('pages.slugs').values({ slugKey: key, slug, pageId, role, isRedirect }).execute();
+    }
+  }
+
+  /** Stop a name pointing at its page, and hold it for slug.tombstone_days so nobody can pass as whoever had it. */
+  async releaseName(trx: Kysely<DB>, slugKey: string, tombstoneDays: number): Promise<void> {
+    await trx
+      .updateTable('pages.slugs')
+      .set({ pageId: null, releasedAt: new Date(), blockedUntil: new Date(Date.now() + tombstoneDays * 24 * 60 * 60 * 1000) })
+      .where('slugKey', '=', slugKey)
+      .execute();
   }
 
   /** When this page's name may next change, or null when it can now. */
@@ -529,9 +586,10 @@ export class PagesService {
       // are shown to run that page.
       const role = await this.role(trx, accountId, pageId);
       if (!role) return { status: 'not_found' as const };
-      if (role !== 'owner') return { status: 'not_allowed' as const };
+      if (role === 'editor') return { status: 'not_allowed' as const };
+      const admin = role === 'admin';
 
-      const availability = await this.nameAvailability(name, pageId);
+      const availability = await this.nameAvailability(name, pageId, admin);
       if (availability.status !== 'available' && availability.status !== 'yours') {
         return { status: 'unavailable' as const, availability };
       }
@@ -551,30 +609,14 @@ export class PagesService {
         return { status: 'ok' as const, slug };
       }
 
-      const waitUntil = this.nextRename(page.slugChangedAt, settings.cooldownDays);
+      const waitUntil = admin ? null : this.nextRename(page.slugChangedAt, settings.cooldownDays);
       if (waitUntil) return { status: 'cooldown' as const, availableAt: waitUntil };
 
       if (current) {
-        await trx
-          .updateTable('pages.slugs')
-          .set({ pageId: null, releasedAt: new Date(), blockedUntil: new Date(Date.now() + settings.tombstoneDays * 24 * 60 * 60 * 1000) })
-          .where('slugKey', '=', current.slugKey)
-          .execute();
+        await this.releaseName(trx, current.slugKey, settings.tombstoneDays);
         await this.audit.record(context, { action: 'slug.released', actorType: 'account', actorAccountId: accountId, targetType: 'slug', targetId: pageId }, trx);
       }
-
-      // An expired hold is reclaimed by updating its row: the name is the key.
-      const key = slug.toLowerCase();
-      const held = await trx.selectFrom('pages.slugs').select('slugKey').where('slugKey', '=', key).executeTakeFirst();
-      if (held) {
-        await trx
-          .updateTable('pages.slugs')
-          .set({ slug, pageId, role: 'primary', claimedAt: new Date(), releasedAt: null, blockedUntil: null })
-          .where('slugKey', '=', key)
-          .execute();
-      } else {
-        await trx.insertInto('pages.slugs').values({ slugKey: key, slug, pageId, role: 'primary' }).execute();
-      }
+      await this.takeName(trx, pageId, slug, 'primary');
 
       // The clock starts at the first change, not at the first name.
       if (current) await trx.updateTable('pages.pages').set({ slugChangedAt: new Date() }).where('id', '=', pageId).execute();
