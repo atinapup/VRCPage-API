@@ -596,6 +596,38 @@
         ]
       }
     },
+    "/v1/showcase": {
+      "get": {
+        "operationId": "showcaseShowcase",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One of the public pages an admin picked for the home page, at random; 404 when none is picked.",
+        "tags": [
+          "pages"
+        ]
+      }
+    },
     "/v1/me/dashboard": {
       "get": {
         "operationId": "meDashboard",
@@ -2006,6 +2038,72 @@
           }
         },
         "summary": "Put a page taken down back up.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/pages/{pageId}/showcase": {
+      "put": {
+        "operationId": "adminShowcase",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Pick a user page as an example for the home page. Several may be picked; each visit shows one.",
+        "tags": [
+          "admin"
+        ]
+      },
+      "delete": {
+        "operationId": "adminUnshowcase",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stop showing a page on the home page.",
         "tags": [
           "admin"
         ]
@@ -4024,6 +4122,10 @@
             "items": {
               "$ref": "#/components/schemas/AdminAlias"
             }
+          },
+          "showcase": {
+            "type": "boolean",
+            "description": "Picked as an example for the home page. Only shown there while it is public."
           }
         },
         "required": [
@@ -4033,7 +4135,8 @@
           "pageId",
           "ownerAccountId",
           "ownerEmail",
-          "aliases"
+          "aliases",
+          "showcase"
         ]
       },
       "HideRequest": {

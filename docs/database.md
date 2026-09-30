@@ -228,6 +228,7 @@ Do not set `usePlural`. Better Auth checks the schema at start-up, and that chec
 
 `pages.slugs` is the single pool of names. `slug_key` (lowercase) is the primary key, so users, groups, aliases and held names can never collide, whatever the capitals.
 - **Primary:** each page has at most one. An **alias** is another name for the same page. With `is_redirect` (the default) it redirects (308) to the primary; without it, it shows the page at the alias itself. Only aliases read `is_redirect`.
+- **Home page examples:** `pages.pages.is_showcase` marks the user pages an admin picked for the home page. `GET /v1/showcase` draws one at random, and only while it is public and not taken down.
 - **Who gets aliases:** admins add them to any page, with no limit. `slug.aliases.max_per_page` (5) is for when `moderator` and `partner` holders get their own, which isn't built yet.
 - **Renaming:**
   - A real rename turns the old row into a hold and inserts a new primary.

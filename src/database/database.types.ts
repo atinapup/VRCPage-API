@@ -437,6 +437,10 @@ export interface PagesPages {
   hiddenBy: string | null;
   hiddenReason: string | null;
   id: Generated<string>;
+  /**
+   * Picked by an admin as the home page example. Shown only while the page is a public, visible user page.
+   */
+  isShowcase: Generated<boolean>;
   kind: PagesPageKind;
   lastViewedAt: Timestamp | null;
   nextRefreshAt: Generated<Timestamp>;

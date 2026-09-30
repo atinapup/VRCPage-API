@@ -102,7 +102,9 @@ Until the rate-limited VRChat client exists, development reads the stand-in reco
 
 An admin has no cooldown, and may also take a name that is held, too short, or looks like VRChat's own. `GET /v1/me/names/{name}` answers an admin by the same rules, so the field and the save agree. Reserved names stay refused for everyone: they are the website's own routes.
 
-An **alias** is another name for a page. `GET /v1/pages/{slug}` answers one with `alias: true`, and with `redirect` saying what to do with it: true sends the visitor on to `slug` (308), false shows the page at the alias, with the address left as typed. The page's canonical address is its own name either way. Only admins add, change or remove aliases (`/v1/admin/pages/{pageId}/aliases`), and a removed alias is held like any released name.
+An **alias** is another name for a page. `GET /v1/pages/{slug}` answers one with `alias: true`, and with `redirect` saying what to do with it: true sends the visitor on to `slug` (308), false shows the page at the alias, with the address left as typed. The page's canonical address is its own name either way. Only admins add, change or remove aliases (`/v1/admin/pages/{pageId}/aliases`), and a removed alias is held like any released name. The website answers a redirect alias in place, without the 308, when the visitor is a link-preview bot, so a shared alias still unfurls.
+
+`GET /v1/showcase` is the example on the website's home page: one of the user pages an admin picked (`/v1/admin/pages/{pageId}/showcase`), at random when there are several, or a 404 when none is. Only public, visible pages are answered, since the home page would otherwise publish an unlisted page's address.
 
 ## Refreshing from VRChat
 
@@ -278,6 +280,7 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `POST /v1/auth/email-change/confirm` | Switch to it |
 | `DELETE /v1/auth/account` | Delete the account and everything it owns |
 | `GET /v1/pages/{slug}` | The public page at a name; one identical 404 for private, hidden, held and unknown |
+| `GET /v1/showcase` | One of the pages picked for the home page, at random; 404 when none is |
 | `GET /v1/me/dashboard` | The dashboard's frame: the account's page, groups, claims left, invites |
 | `GET /v1/me/page` | The account's own page, whatever its visibility |
 | `GET /v1/me/groups/{pageId}` | A group it owns or edits; any other id is a 404 |
@@ -308,8 +311,9 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `DELETE /v1/admin/accounts/{accountId}/vrchat` | Admins: disconnect its VRChat account |
 | `DELETE /v1/admin/accounts/{accountId}` | Admins: delete it and everything it owns |
 | `GET /v1/admin/pages` | Admins: every page, whatever its visibility, 50 at a time |
-| `GET /v1/admin/pages/{pageId}` | Admins: one page with its owner, aliases and takedown |
+| `GET /v1/admin/pages/{pageId}` | Admins: one page with its owner, aliases, takedown and whether it is a home page example |
 | `PUT`, `DELETE /v1/admin/pages/{pageId}/hidden` | Admins: take it down with a reason, or put it back |
+| `PUT`, `DELETE /v1/admin/pages/{pageId}/showcase` | Admins: pick a person's page as a home page example, or drop it |
 | `POST /v1/admin/pages/{pageId}/aliases` | Admins: give it another name, which redirects or shows the page |
 | `PATCH`, `DELETE /v1/admin/pages/{pageId}/aliases/{name}` | Admins: flip an alias's redirect, or remove it |
 | `POST /v1/webhooks/resend` | Resend's delivery events. Signed; not in `openapi.json` |

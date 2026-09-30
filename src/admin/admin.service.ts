@@ -317,7 +317,7 @@ export class AdminService {
     const [row] = await this.pageRows((select) => select.where('o.pageId', '=', pageId));
     if (!row) return null;
     const [state, aliases] = await Promise.all([
-      this.db.selectFrom('pages.pages').select(['hiddenAt', 'hiddenReason']).where('id', '=', pageId).executeTakeFirstOrThrow(),
+      this.db.selectFrom('pages.pages').select(['hiddenAt', 'hiddenReason', 'isShowcase']).where('id', '=', pageId).executeTakeFirstOrThrow(),
       this.db.selectFrom('pages.slugs').select(['slug', 'isRedirect']).where('pageId', '=', pageId).where('role', '=', 'alias').orderBy('claimedAt').execute(),
     ]);
     const page: AdminPage = {
@@ -328,6 +328,7 @@ export class AdminService {
       ownerAccountId: row.ownerAccountId,
       ownerEmail: row.ownerEmail,
       aliases: aliases.map((alias) => ({ slug: alias.slug, redirect: alias.isRedirect })),
+      showcase: state.isShowcase,
     };
     if (row.kind === 'user') page.user = (await this.pages.userPage(pageId)) ?? undefined;
     else page.group = (await this.pages.groupPage(pageId)) ?? undefined;
@@ -345,6 +346,22 @@ export class AdminService {
         .executeTakeFirst();
       if (!page) return false;
       await this.audit.record(context, this.event(adminId, { action: reason ? 'admin.page_hidden' : 'admin.page_restored', targetType: 'page', targetId: pageId }), trx);
+      return true;
+    });
+  }
+
+  /** Pick a user page as a home page example, or drop it. Groups can't be picked. */
+  async setShowcase(context: RequestContext, adminId: string, pageId: string, showcase: boolean): Promise<boolean> {
+    return this.db.write(this.actor(context, adminId), async (trx) => {
+      const page = await trx
+        .updateTable('pages.pages')
+        .set({ isShowcase: showcase })
+        .where('id', '=', pageId)
+        .where('kind', '=', 'user')
+        .returning('id')
+        .executeTakeFirst();
+      if (!page) return false;
+      await this.audit.record(context, this.event(adminId, { action: showcase ? 'admin.page_showcased' : 'admin.page_unshowcased', targetType: 'page', targetId: pageId }), trx);
       return true;
     });
   }

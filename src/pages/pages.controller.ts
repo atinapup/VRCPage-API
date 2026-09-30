@@ -48,6 +48,22 @@ export class PagesController {
   }
 }
 
+/** The example on vrc.page's home page. */
+@ApiTags('pages')
+@Controller('showcase')
+export class ShowcaseController {
+  constructor(private readonly pages: PagesService) {}
+
+  /** One of the public pages an admin picked for the home page, at random; 404 when none is picked. */
+  @Get()
+  @RateLimit('pages', 240, 60)
+  async showcase(): Promise<PublicPage> {
+    const page = await this.pages.showcasePage();
+    if (!page) throw new NotFoundException('No page is picked for the home page.');
+    return page;
+  }
+}
+
 /** The signed-in account's own things, for the dashboard. */
 @ApiTags('me')
 @Controller('me')

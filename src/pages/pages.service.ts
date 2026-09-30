@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import { Audit } from '../audit/audit.js';
 import type { RequestContext } from '../common/request-context.js';
 import { AppConfig } from '../config/app-config.js';
@@ -263,6 +263,28 @@ export class PagesService {
     }
     const group = await this.groupPage(found.id);
     return group ? { kind: 'group', slug: primary, alias, redirect, group } : null;
+  }
+
+  /**
+   * One of the pages an admin picked for the home page, at random, or null
+   * when none is picked. Only public user pages count: the home page would
+   * otherwise publish an unlisted page's address.
+   */
+  async showcasePage(): Promise<PublicPage | null> {
+    const found = await this.db
+      .selectFrom('pages.pages as p')
+      .innerJoin('pages.slugs as s', (join) => join.onRef('s.pageId', '=', 'p.id').on('s.role', '=', 'primary'))
+      .select(['p.id', 's.slug'])
+      .where('p.isShowcase', '=', true)
+      .where('p.kind', '=', 'user')
+      .where('p.visibility', '=', 'public')
+      .where('p.hiddenAt', 'is', null)
+      .orderBy(sql`random()`)
+      .limit(1)
+      .executeTakeFirst();
+    if (!found) return null;
+    const user = await this.userPage(found.id);
+    return user ? { kind: 'user', slug: found.slug, alias: false, redirect: false, user } : null;
   }
 
   /* The signed-in account's own pages ------------------------------------- */

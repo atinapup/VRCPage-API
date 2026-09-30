@@ -126,6 +126,8 @@ export class AdminPage {
   ownerAccountId!: string;
   ownerEmail!: string;
   aliases!: AdminAlias[];
+  /** Picked as an example for the home page. Only shown there while it is public. */
+  showcase!: boolean;
   @ApiProperty({ type: UserPage, required: false })
   user?: UserPage;
   @ApiProperty({ type: GroupPage, required: false })

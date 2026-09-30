@@ -162,6 +162,22 @@ export class AdminController {
     if (!found) throw noPage();
   }
 
+  /** Pick a user page as an example for the home page. Several may be picked; each visit shows one. */
+  @Put('pages/:pageId/showcase')
+  @HttpCode(204)
+  async showcase(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string): Promise<void> {
+    const found = UUID.test(pageId) && (await this.admin.setShowcase(requestContext(request), viewer.accountId, pageId, true));
+    if (!found) throw new NotFoundException('There is no person’s page with that id.');
+  }
+
+  /** Stop showing a page on the home page. */
+  @Delete('pages/:pageId/showcase')
+  @HttpCode(204)
+  async unshowcase(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string): Promise<void> {
+    const found = UUID.test(pageId) && (await this.admin.setShowcase(requestContext(request), viewer.accountId, pageId, false));
+    if (!found) throw new NotFoundException('There is no person’s page with that id.');
+  }
+
   /** Give a page another name. By default it redirects (308) to the page's own name. */
   @Post('pages/:pageId/aliases')
   @HttpCode(204)
