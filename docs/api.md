@@ -228,7 +228,7 @@ VRChat icons and banners are copied, never linked: a public page must not make a
 ## Appearance and accessibility
 
 - **A page's accent colour** is `PUT /v1/me/pages/{pageId}/accent` (`{accent: "#rrggbb" | null}`), owners and editors. Pages carry `accent`; the website works the page's whole palette out from it.
-- **How the site looks for one account** is `GET` / `PATCH /v1/me/preferences`: `highContrast` and `dyslexiaFont`, kept in `auth.account_preferences`. The website mirrors them into a cookie of its own so they apply before a page is drawn.
+- **How the site looks for one account** is `GET` / `PATCH /v1/me/preferences`: `highContrast`, `dyslexiaFont` and `lightMode` (light mode on the website), kept in `auth.account_preferences`. The website mirrors them into a cookie of its own so they apply before a page is drawn.
 
 ## What's new
 
@@ -309,7 +309,7 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `GET /v1/me/page` | The account's own page, whatever its visibility |
 | `GET /v1/me/groups/{pageId}` | A group it owns or edits; any other id is a 404 |
 | `GET /v1/me/notification-preferences` | Which emails it gets |
-| `GET`, `PATCH /v1/me/preferences` | Higher contrast and the dyslexia font, for this account |
+| `GET`, `PATCH /v1/me/preferences` | Higher contrast, the dyslexia font and light colours, for this account |
 | `GET /v1/me/updates` | The latest "What's new" updates, and how far this account has read |
 | `POST /v1/me/updates/seen` | Everything published so far has been seen |
 | `GET /v1/updates/media/{file}` | A picture or clip from an update |

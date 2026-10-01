@@ -130,7 +130,7 @@ export class PageSettingsController {
 export class PreferencesController {
   constructor(private readonly settings: PageSettingsService) {}
 
-  /** Higher contrast and the dyslexia font. */
+  /** Higher contrast, the dyslexia font and light colours. */
   @Get()
   preferences(@CurrentViewer() viewer: Viewer): Promise<Preferences> {
     return this.settings.preferences(viewer.accountId);
@@ -141,6 +141,7 @@ export class PreferencesController {
   setPreferences(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Body() body: PreferencesPatch): Promise<Preferences> {
     return this.settings.setPreferences(requestContext(request), viewer.accountId, {
       highContrast: optionalFlag(body, 'highContrast'),
+      lightMode: optionalFlag(body, 'lightMode'),
       dyslexiaFont: optionalFlag(body, 'dyslexiaFont'),
     });
   }

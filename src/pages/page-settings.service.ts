@@ -16,7 +16,7 @@ import { PagesService } from './pages.service.js';
  * show, an accent colour, and a picture and banner of its own. Owners and
  * editors may both change these, the same as links: they are how the page
  * looks, not who it belongs to. And how vrc.page itself looks for one
- * account: higher contrast and a dyslexia font.
+ * account: higher contrast, a dyslexia font and light colours.
  */
 
 /** #rrggbb, lowercase on the way in. */
@@ -126,10 +126,10 @@ export class PageSettingsService {
   async preferences(accountId: string): Promise<Preferences> {
     const row = await this.db
       .selectFrom('auth.accountPreferences')
-      .select(['highContrast', 'dyslexiaFont'])
+      .select(['highContrast', 'dyslexiaFont', 'lightMode'])
       .where('accountId', '=', accountId)
       .executeTakeFirst();
-    return { highContrast: row?.highContrast ?? false, dyslexiaFont: row?.dyslexiaFont ?? false };
+    return { highContrast: row?.highContrast ?? false, dyslexiaFont: row?.dyslexiaFont ?? false, lightMode: row?.lightMode ?? false };
   }
 
   /** No row means the defaults, so the first change writes one. */
@@ -137,6 +137,7 @@ export class PageSettingsService {
     const current = await this.preferences(accountId);
     const next: Preferences = {
       highContrast: patch.highContrast ?? current.highContrast,
+      lightMode: patch.lightMode ?? current.lightMode,
       dyslexiaFont: patch.dyslexiaFont ?? current.dyslexiaFont,
     };
     return this.db.write({ requestId: context.requestId, type: 'account', accountId }, async (trx) => {

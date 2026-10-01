@@ -31,6 +31,8 @@ export class Preferences {
   highContrast!: boolean;
   /** OpenDyslexic for all text. */
   dyslexiaFont!: boolean;
+  /** Light colours instead of dark (light mode on the website). */
+  lightMode!: boolean;
 }
 
 /** The preferences to change; the ones left out stay as they are. */
@@ -39,4 +41,6 @@ export class PreferencesPatch {
   highContrast?: boolean;
   @ApiProperty({ required: false })
   dyslexiaFont?: boolean;
+  @ApiProperty({ required: false })
+  lightMode?: boolean;
 }

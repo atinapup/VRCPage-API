@@ -1702,7 +1702,7 @@
             }
           }
         },
-        "summary": "Higher contrast and the dyslexia font.",
+        "summary": "Higher contrast, the dyslexia font and light colours.",
         "tags": [
           "me"
         ]
@@ -4638,11 +4638,16 @@
           "dyslexiaFont": {
             "type": "boolean",
             "description": "OpenDyslexic for all text."
+          },
+          "lightMode": {
+            "type": "boolean",
+            "description": "Light colours instead of dark (light mode on the website)."
           }
         },
         "required": [
           "highContrast",
-          "dyslexiaFont"
+          "dyslexiaFont",
+          "lightMode"
         ]
       },
       "PreferencesPatch": {
@@ -4652,6 +4657,9 @@
             "type": "boolean"
           },
           "dyslexiaFont": {
+            "type": "boolean"
+          },
+          "lightMode": {
             "type": "boolean"
           }
         }

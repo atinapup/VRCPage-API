@@ -142,6 +142,10 @@ export interface AuthAccountPreferences {
   createdAt: Generated<Timestamp>;
   dyslexiaFont: Generated<boolean>;
   highContrast: Generated<boolean>;
+  /**
+   * Light colours instead of dark (light mode on the website).
+   */
+  lightMode: Generated<boolean>;
   updatedAt: Generated<Timestamp>;
   /**
    * Updates published after this are new to the account. NULL: its creation time.
