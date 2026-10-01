@@ -38,6 +38,7 @@ export const PROBLEM_CODES = [
   'link_invalid',
   'link_blocked',
   'link_duplicate',
+  'link_stream_key',
   'label_too_long',
   'refresh_cooldown',
   'refresh_daily_limit',

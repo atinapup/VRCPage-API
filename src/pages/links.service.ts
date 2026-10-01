@@ -23,7 +23,7 @@ export type SaveFailure =
   | { status: 'not_found' }
   | { status: 'disabled' }
   | { status: 'too_many'; max: number }
-  | { status: 'bad_link'; at: number; reason: 'empty' | 'not_url' | 'not_https' | 'blocked' | 'duplicate' | 'label_too_long' };
+  | { status: 'bad_link'; at: number; reason: 'empty' | 'not_url' | 'not_https' | 'blocked' | 'stream_key' | 'duplicate' | 'label_too_long' };
 
 export type SaveResult = { status: 'ok'; links: OwnLink[] } | SaveFailure;
 
@@ -46,7 +46,7 @@ export class LinksService {
   }
 
   private rows(executor: Kysely<DB>, pageId: string) {
-    return executor.selectFrom('pages.links').select(['id', 'url', 'label']).where('pageId', '=', pageId).orderBy('position').execute();
+    return executor.selectFrom('pages.links').select(['id', 'url', 'label', 'isAdult as adult']).where('pageId', '=', pageId).orderBy('position').execute();
   }
 
   /** A page's own links, or null when this account doesn't run that page. */
@@ -65,7 +65,7 @@ export class LinksService {
 
     // Everything is checked before anything is written, so a list with one
     // bad address in it changes nothing at all.
-    const wanted: Array<{ url: string; label: string | null; identity: string }> = [];
+    const wanted: Array<{ url: string; label: string | null; adult: boolean; identity: string }> = [];
     const seen = new Set<string>();
     for (const [at, input] of inputs.entries()) {
       const check = checkLink(String(input?.url ?? ''), settings.blocked);
@@ -90,7 +90,7 @@ export class LinksService {
 
       const label = typeof input?.label === 'string' ? input.label.trim() : '';
       if (Array.from(label).length > settings.labelMax) return { status: 'bad_link', at, reason: 'label_too_long' };
-      wanted.push({ url: check.url, label: label || null, identity });
+      wanted.push({ url: check.url, label: label || null, adult: input?.adult === true, identity });
     }
 
     return this.db.write({ requestId: context.requestId, type: 'account', accountId }, async (trx) => {
@@ -114,12 +114,20 @@ export class LinksService {
       for (const [position, link] of wanted.entries()) {
         const existing = byIdentity.get(link.identity);
         if (existing) {
-          // The same link, so it keeps its id: only where it sits and what it
-          // is called can have changed.
-          await trx.updateTable('pages.links').set({ url: link.url, label: link.label, position, updatedAt: new Date() }).where('id', '=', existing.id).execute();
+          // The same link, so it keeps its id: only where it sits, what it is
+          // called and whether it is 18+ can have changed.
+          await trx
+            .updateTable('pages.links')
+            .set({ url: link.url, label: link.label, isAdult: link.adult, position, updatedAt: new Date() })
+            .where('id', '=', existing.id)
+            .execute();
           continue;
         }
-        const added = await trx.insertInto('pages.links').values({ pageId, url: link.url, label: link.label, position }).returning('id').executeTakeFirstOrThrow();
+        const added = await trx
+          .insertInto('pages.links')
+          .values({ pageId, url: link.url, label: link.label, isAdult: link.adult, position })
+          .returning('id')
+          .executeTakeFirstOrThrow();
         await this.audit.record(
           context,
           { action: 'link_item.added', actorType: 'account', actorAccountId: accountId, targetType: 'link', targetId: added.id },

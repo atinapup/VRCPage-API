@@ -8,6 +8,7 @@ import { MailService } from '../mail/mail.service.js';
 import type { DB } from '../database/database.types.js';
 import { imagePath } from '../vrchat/images.js';
 import { checkLink } from './links.js';
+import { liveStreams } from './streams.js';
 import type {
   Dashboard,
   NameAvailability,
@@ -125,11 +126,11 @@ export class PagesService {
    * only plain https ever reaches a page.
    */
   private async links(pageId: string, fromVRChat: string[]): Promise<PageLink[]> {
-    const own = await this.db.selectFrom('pages.links').select(['url', 'label']).where('pageId', '=', pageId).orderBy('position').execute();
+    const own = await this.db.selectFrom('pages.links').select(['url', 'label', 'isAdult']).where('pageId', '=', pageId).orderBy('position').execute();
     const checked = fromVRChat.map((raw) => checkLink(raw, NOTHING_BLOCKED)).filter((link) => link.status === 'ok');
     return [
-      ...checked.map(({ url }) => ({ url, label: null, source: 'vrchat' as const })),
-      ...own.map((link) => ({ url: link.url, label: link.label, source: 'vrcpage' as const })),
+      ...checked.map(({ url }) => ({ url, label: null, source: 'vrchat' as const, adult: false })),
+      ...own.map((link) => ({ url: link.url, label: link.label, source: 'vrcpage' as const, adult: link.isAdult })),
     ];
   }
 
@@ -259,10 +260,10 @@ export class PagesService {
 
     if (found.kind === 'user') {
       const user = await this.userPage(found.id);
-      return user ? { kind: 'user', slug: primary, alias, redirect, user } : null;
+      return user ? { kind: 'user', slug: primary, alias, redirect, user, live: await liveStreams(user.links) } : null;
     }
     const group = await this.groupPage(found.id);
-    return group ? { kind: 'group', slug: primary, alias, redirect, group } : null;
+    return group ? { kind: 'group', slug: primary, alias, redirect, group, live: await liveStreams(group.links) } : null;
   }
 
   /**
@@ -284,7 +285,7 @@ export class PagesService {
       .executeTakeFirst();
     if (!found) return null;
     const user = await this.userPage(found.id);
-    return user ? { kind: 'user', slug: found.slug, alias: false, redirect: false, user } : null;
+    return user ? { kind: 'user', slug: found.slug, alias: false, redirect: false, user, live: [] } : null;
   }
 
   /* The signed-in account's own pages ------------------------------------- */
@@ -552,7 +553,8 @@ export class PagesService {
    * Put a name on a page, as its primary or as an alias. A name used before
    * is a row already (the name is the key), whether it is held or is one of
    * this page's aliases, so taking it updates that row. The caller has
-   * checked that the name is free.
+   * checked that the name is free. Names are stored lowercase, however they
+   * were typed, so an address is only ever written one way.
    */
   async takeName(trx: Kysely<DB>, pageId: string, slug: string, role: 'primary' | 'alias', isRedirect = true): Promise<void> {
     const key = slug.toLowerCase();
@@ -560,11 +562,11 @@ export class PagesService {
     if (existing) {
       await trx
         .updateTable('pages.slugs')
-        .set({ slug, pageId, role, isRedirect, claimedAt: new Date(), releasedAt: null, blockedUntil: null })
+        .set({ slug: key, pageId, role, isRedirect, claimedAt: new Date(), releasedAt: null, blockedUntil: null })
         .where('slugKey', '=', key)
         .execute();
     } else {
-      await trx.insertInto('pages.slugs').values({ slugKey: key, slug, pageId, role, isRedirect }).execute();
+      await trx.insertInto('pages.slugs').values({ slugKey: key, slug: key, pageId, role, isRedirect }).execute();
     }
   }
 
@@ -589,8 +591,8 @@ export class PagesService {
    *
    * The first name is free to pick. The cooldown starts with the first
    * change, so a typo on day one can still be fixed. A replaced name is held
-   * for slug.tombstone_days. Changing only the capitals keeps the same name
-   * and costs nothing.
+   * for slug.tombstone_days. Names are lowercase, so a name typed with
+   * capitals is the same name.
    */
   async setName(
     context: RequestContext,
@@ -616,20 +618,17 @@ export class PagesService {
         return { status: 'unavailable' as const, availability };
       }
 
-      const slug = name.trim();
+      const slug = name.trim().toLowerCase();
       const page = await trx.selectFrom('pages.pages').select(['slugChangedAt']).where('id', '=', pageId).executeTakeFirstOrThrow();
       const current = await trx
         .selectFrom('pages.slugs')
-        .select(['slugKey', 'slug'])
+        .select('slugKey')
         .where('pageId', '=', pageId)
         .where('role', '=', 'primary')
         .executeTakeFirst();
 
-      // Only the capitals changed: the same name, so no hold and no cooldown.
-      if (current && current.slugKey === slug.toLowerCase()) {
-        if (current.slug !== slug) await trx.updateTable('pages.slugs').set({ slug }).where('slugKey', '=', current.slugKey).execute();
-        return { status: 'ok' as const, slug };
-      }
+      // Its own name again: nothing to change, so no hold and no cooldown.
+      if (current && current.slugKey === slug) return { status: 'ok' as const, slug };
 
       const waitUntil = admin ? null : this.nextRename(page.slugChangedAt, settings.cooldownDays);
       if (waitUntil) return { status: 'cooldown' as const, availableAt: waitUntil };

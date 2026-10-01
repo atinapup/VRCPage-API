@@ -98,11 +98,11 @@ Until the rate-limited VRChat client exists, development reads the stand-in reco
 
 `pages.slugs` is one pool for users and groups. `GET /v1/me/names/{name}` answers `available`, `yours`, `taken`, `held`, `reserved`, `impersonation`, `invalid`, `too_short` or `too_long`; the website checks the shape as you type, and this is the check that counts. `held` is a name released in the last `slug.tombstone_days`, kept apart from `taken` here even though a screen may word them alike.
 
-`PUT /v1/me/pages/{pageId}/name` is owners only. The first name is free; a change starts the `slug.change_cooldown_days` clock and puts the name it replaced into a hold, so nobody can pick it up to pass as its old owner. Changing only the capitals keeps the same name and costs nothing.
+`PUT /v1/me/pages/{pageId}/name` is owners only. The first name is free; a change starts the `slug.change_cooldown_days` clock and puts the name it replaced into a hold, so nobody can pick it up to pass as its old owner. Names are lowercase: a name sent with capitals is stored without them, and sending a page's own name again changes nothing.
 
 An admin has no cooldown, and may also take a name that is held, too short, or looks like VRChat's own. `GET /v1/me/names/{name}` answers an admin by the same rules, so the field and the save agree. Reserved names stay refused for everyone: they are the website's own routes.
 
-An **alias** is another name for a page. `GET /v1/pages/{slug}` answers one with `alias: true`, and with `redirect` saying what to do with it: true sends the visitor on to `slug` (308), false shows the page at the alias, with the address left as typed. The page's canonical address is its own name either way. Only admins add, change or remove aliases (`/v1/admin/pages/{pageId}/aliases`), and a removed alias is held like any released name. The website answers a redirect alias in place, without the 308, when the visitor is a link-preview bot, so a shared alias still unfurls.
+An **alias** is another name for a page. `GET /v1/pages/{slug}` answers one with `alias: true`, and with `redirect` saying what to do with it: true sends the visitor on to `slug` (308), false shows the page at the alias, with the address left as it is. The page's canonical address is its own name either way. Only admins add, change or remove aliases (`/v1/admin/pages/{pageId}/aliases`), and a removed alias is held like any released name. The website answers a redirect alias in place, without the 308, when the visitor is a link-preview bot, so a shared alias still unfurls.
 
 `GET /v1/showcase` is the example on the website's home page: one of the user pages an admin picked (`/v1/admin/pages/{pageId}/showcase`), at random when there are several, or a 404 when none is. Only public, visible pages are answered, since the home page would otherwise publish an unlisted page's address.
 
@@ -134,9 +134,13 @@ An owner asks somebody to help run a group by their vrc.page name, because that 
 A page shows VRChat's links first, then the ones added on vrc.page. `PUT /v1/me/pages/{pageId}/links` takes the page's own links in full and in order, so adding, editing, reordering and removing are one kind of save. Owners and editors may both change them; it is the whole of an editor's job.
 
 - **Every address is checked before anything is written** (`src/pages/links.ts`, spec section 15): parsed with the URL constructor, only plain https kept, credentials and a default port stripped, hosts in `links.custom.blocked_hosts` refused. A list with one bad link in it changes nothing, and the refusal carries `at`, the position of the link it is about.
+- **VRCDN viewer links are the one exception to https-only.** `rtspt://` and `rtsp://stream.vrcdn.live/live/<name>`, `https://stream.vrcdn.live/live/<name>.live.ts` or `.live.flv`, and `vrcdn.live/preview/<name>` are all stored as `https://vrcdn.live/preview/<name>`, the stream's own page. An `rtmp://ingest.vrcdn.live/...` address carries the streamer's secret key and is refused as `link_stream_key`.
+- **A link can be marked 18+** with `adult: true`. `PageLink.adult` carries it to the website, which also treats every OnlyFans and Fansly link as 18+ and asks visitors to confirm before opening one.
 - **The same link twice is refused**, by one identity rule: the host with or without www, the path with or without a trailing slash, and the query.
 - **A row keeps its id while its address stays the same**, so a reorder or a new label is an update, and only a link that really came or went is recorded as `link_item.added` or `link_item.removed`.
 - Limits come from `links.custom.*`: 8 links, 40-character labels, and a switch to turn adding off.
+
+`GET /v1/pages/{slug}` also answers `live`: the page's VRCDN streams that are live right now (`src/pages/streams.ts`). Each is asked about at most every 30 seconds, by requesting its MPEG-TS address with a 2-second timeout, so a slow VRCDN costs a page two seconds at most and never fails it. Twitch and YouTube need developer keys and are not checked yet.
 
 ## Admin
 
@@ -158,7 +162,7 @@ Some changes need rules of their own:
 
 ### Refusals a client can act on
 
-Beyond the status code, `type` names the kind: `https://vrc.page/problems/<code>`, with one of the codes in `src/common/problem.ts` — `bot_check_failed`, `cooldown` (with `retryAfter`), `invalid_email`, `same_email`, `email_taken`, `signups_closed`, `pending_expired`, `wrong_code`, `code_expired`, `code_exhausted`, `provider_not_configured`, `not_connected`, `not_allowed`, `invalid_link`, `short_link`, `already_connected`, `vrchat_taken`, `vrchat_not_found`, `group_taken`, `not_group_owner`, `group_private`, `group_limit`, `no_such_page`, `invite_self`, `already_editor`, `already_invited`, `editor_limit`, `links_disabled`, `too_many_links`, `link_invalid`, `link_blocked`, `link_duplicate`, `label_too_long`, `refresh_cooldown` (with `retryAfter`), `refresh_daily_limit`, `vrchat_gone`, `group_unclaimed`, `name_unavailable`, `name_cooldown`, `session_stale`, `not_signed_in`, `unavailable`. Anything else is `about:blank`, where the status says it all. A refusal about one item of a submitted list also carries `at`, that item's position counting from 0.
+Beyond the status code, `type` names the kind: `https://vrc.page/problems/<code>`, with one of the codes in `src/common/problem.ts` — `bot_check_failed`, `cooldown` (with `retryAfter`), `invalid_email`, `same_email`, `email_taken`, `signups_closed`, `pending_expired`, `wrong_code`, `code_expired`, `code_exhausted`, `provider_not_configured`, `not_connected`, `not_allowed`, `invalid_link`, `short_link`, `already_connected`, `vrchat_taken`, `vrchat_not_found`, `group_taken`, `not_group_owner`, `group_private`, `group_limit`, `no_such_page`, `invite_self`, `already_editor`, `already_invited`, `editor_limit`, `links_disabled`, `too_many_links`, `link_invalid`, `link_blocked`, `link_duplicate`, `link_stream_key`, `label_too_long`, `refresh_cooldown` (with `retryAfter`), `refresh_daily_limit`, `vrchat_gone`, `group_unclaimed`, `name_unavailable`, `name_cooldown`, `session_stale`, `not_signed_in`, `unavailable`. Anything else is `about:blank`, where the status says it all. A refusal about one item of a submitted list also carries `at`, that item's position counting from 0.
 
 ## Reading VRChat
 

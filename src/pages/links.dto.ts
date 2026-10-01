@@ -7,6 +7,8 @@ export class OwnLink {
   url!: string;
   @ApiProperty({ type: String, nullable: true })
   label!: string | null;
+  /** Marked 18+. Visitors confirm before it opens. */
+  adult!: boolean;
 }
 
 /** A page's own links, in the order they are shown. */
@@ -28,6 +30,9 @@ export class LinkInput {
   url!: string;
   @ApiProperty({ type: String, required: false, nullable: true })
   label?: string | null;
+  /** Marks the link 18+. Defaults to false. */
+  @ApiProperty({ type: Boolean, required: false })
+  adult?: boolean;
 }
 
 /**

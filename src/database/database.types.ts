@@ -403,6 +403,10 @@ export interface PagesEditors {
 export interface PagesLinks {
   createdAt: Generated<Timestamp>;
   id: Generated<string>;
+  /**
+   * Marked 18+ by the page's owner or an editor. Visitors confirm before it opens.
+   */
+  isAdult: Generated<boolean>;
   label: string | null;
   pageId: string;
   position: number;
@@ -473,7 +477,7 @@ export interface PagesSlugs {
    */
   role: PagesSlugRole;
   /**
-   * The name as typed, which is how it is shown.
+   * The name, lowercase. The same as slug_key.
    */
   slug: string;
   slugKey: string;

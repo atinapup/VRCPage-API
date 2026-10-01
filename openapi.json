@@ -2876,12 +2876,17 @@
           "url": {
             "type": "string",
             "description": "An absolute https URL. Never rendered as markup."
+          },
+          "adult": {
+            "type": "boolean",
+            "description": "Marked 18+ by its owner. Always false for VRChat's links; the website also treats OnlyFans and Fansly as 18+."
           }
         },
         "required": [
           "label",
           "source",
-          "url"
+          "url",
+          "adult"
         ]
       },
       "UserPage": {
@@ -3102,6 +3107,30 @@
           "lastRefreshedAt"
         ]
       },
+      "LiveStream": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "vrcdn"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The stream's name on VRCDN."
+          },
+          "url": {
+            "type": "string",
+            "description": "Where anybody can watch it: https://vrcdn.live/preview/<name>."
+          }
+        },
+        "required": [
+          "platform",
+          "name",
+          "url"
+        ]
+      },
       "PublicPage": {
         "type": "object",
         "properties": {
@@ -3118,9 +3147,16 @@
           "group": {
             "$ref": "#/components/schemas/GroupPage"
           },
+          "live": {
+            "description": "Its streams that are live right now, VRCDN's for now. Asked of each\nstream at most every 30 seconds. Always empty from /v1/showcase.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveStream"
+            }
+          },
           "slug": {
             "type": "string",
-            "description": "The page's own name, as its owner typed it."
+            "description": "The page's own name, lowercase."
           },
           "alias": {
             "type": "boolean",
@@ -3133,6 +3169,7 @@
         },
         "required": [
           "kind",
+          "live",
           "slug",
           "alias",
           "redirect"
@@ -3563,12 +3600,17 @@
           "url": {
             "type": "string",
             "description": "The stored https address, normalized."
+          },
+          "adult": {
+            "type": "boolean",
+            "description": "Marked 18+. Visitors confirm before it opens."
           }
         },
         "required": [
           "label",
           "id",
-          "url"
+          "url",
+          "adult"
         ]
       },
       "PageLinks": {
@@ -3606,6 +3648,10 @@
           "label": {
             "type": "string",
             "nullable": true
+          },
+          "adult": {
+            "type": "boolean",
+            "description": "Marks the link 18+. Defaults to false."
           },
           "url": {
             "type": "string",

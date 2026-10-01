@@ -9,6 +9,18 @@ export class PageLink {
   label!: string | null;
   @ApiProperty({ enum: ['vrchat', 'vrcpage'], description: "vrchat: from the VRChat bio or group. vrcpage: added on vrc.page." })
   source!: 'vrchat' | 'vrcpage';
+  /** Marked 18+ by its owner. Always false for VRChat's links; the website also treats OnlyFans and Fansly as 18+. */
+  adult!: boolean;
+}
+
+/** One of a page's streams that is live right now. */
+export class LiveStream {
+  @ApiProperty({ enum: ['vrcdn'] })
+  platform!: 'vrcdn';
+  /** The stream's name on VRCDN. */
+  name!: string;
+  /** Where anybody can watch it: https://vrcdn.live/preview/<name>. */
+  url!: string;
 }
 
 export class RepresentedGroup {
@@ -97,7 +109,7 @@ export class GroupPage {
 export class PublicPage {
   @ApiProperty({ enum: ['user', 'group'] })
   kind!: 'user' | 'group';
-  /** The page's own name, as its owner typed it. */
+  /** The page's own name, lowercase. */
   slug!: string;
   /** The name asked for is an alias of `slug`. */
   alias!: boolean;
@@ -107,6 +119,12 @@ export class PublicPage {
   user?: UserPage;
   @ApiProperty({ type: GroupPage, required: false })
   group?: GroupPage;
+  /**
+   * Its streams that are live right now, VRCDN's for now. Asked of each
+   * stream at most every 30 seconds. Always empty from /v1/showcase.
+   */
+  @ApiProperty({ type: [LiveStream] })
+  live!: LiveStream[];
 }
 
 /** One page in the dashboard's navigation. */
