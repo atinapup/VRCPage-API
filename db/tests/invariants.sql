@@ -80,9 +80,9 @@ INSERT INTO pages.pages (id, kind, vrchat_user_id, vrchat_group_id) VALUES
   ('00000000-0000-7000-8000-0000000000c1', 'user',  'usr_cccccccc-cccc-4ccc-8ccc-cccccccccccc', NULL);
 
 INSERT INTO pages.slugs (slug_key, slug, page_id, role) VALUES
-  ('atian',       'Atian',       '00000000-0000-7000-8000-0000000000a1', 'primary'),
+  ('atian',       'atian',       '00000000-0000-7000-8000-0000000000a1', 'primary'),
   ('atianpup',    'atianpup',    '00000000-0000-7000-8000-0000000000a1', 'alias'),
-  ('nightmarket', 'NightMarket', '00000000-0000-7000-8000-0000000000a2', 'primary'),
+  ('nightmarket', 'nightmarket', '00000000-0000-7000-8000-0000000000a2', 'primary'),
   ('editor1',     'editor1',     '00000000-0000-7000-8000-0000000000e1', 'primary'),
   ('invitee',     'invitee',     '00000000-0000-7000-8000-0000000000c1', 'primary');
 
@@ -181,6 +181,24 @@ BEGIN
 END
 $$;
 
+-- A banner uploaded on vrc.page has no VRChat address, is kept while its
+-- page uses it, and goes when the page stops using it.
+INSERT INTO vrchat.images (id, sha256, width, height, byte_size, bytes, source_url) VALUES
+  ('00000000-0000-7000-8000-000000000b04', sha256('uploaded banner'), 1, 1, 1, decode('00', 'hex'), NULL);
+UPDATE pages.pages SET banner_image_id = '00000000-0000-7000-8000-000000000b04'
+ WHERE id = '00000000-0000-7000-8000-0000000000e1';
+SET SESSION AUTHORIZATION vrcpage_api;
+SELECT internal.test_rejects($$DELETE FROM vrchat.images WHERE id = '00000000-0000-7000-8000-000000000b04'$$, 'API deletes a page''s own banner');
+UPDATE pages.pages SET banner_image_id = NULL WHERE id = '00000000-0000-7000-8000-0000000000e1';
+RESET SESSION AUTHORIZATION;
+
+DO $$
+BEGIN
+  ASSERT NOT EXISTS (SELECT 1 FROM vrchat.images WHERE id = '00000000-0000-7000-8000-000000000b04'), 'uploaded banner removed with its page''s use';
+  RAISE NOTICE 'ok    uploaded banners go when their page stops using them';
+END
+$$;
+
 -------------------------------------------------------------------------------
 -- 3. Deleting a staff account keeps what they did, minus their id.
 -------------------------------------------------------------------------------
@@ -273,14 +291,17 @@ $$;
 
 SET SESSION AUTHORIZATION vrcpage_api;
 SELECT internal.test_rejects($$INSERT INTO pages.slugs (slug_key, slug, page_id, role)
-                               VALUES ('editor1', 'EDITOR1', '00000000-0000-7000-8000-0000000000c1', 'alias')$$,
-                             'alias reuses another page''s name in other capitals');
+                               VALUES ('editor1', 'editor1', '00000000-0000-7000-8000-0000000000c1', 'alias')$$,
+                             'alias reuses another page''s name');
 SELECT internal.test_rejects($$INSERT INTO pages.slugs (slug_key, slug, page_id, role)
-                               VALUES ('nightmarket', 'NIGHTMARKET', '00000000-0000-7000-8000-0000000000c1', 'primary')$$,
+                               VALUES ('nightmarket', 'nightmarket', '00000000-0000-7000-8000-0000000000c1', 'primary')$$,
                              'user page takes a held group name');
 SELECT internal.test_rejects($$INSERT INTO pages.slugs (slug_key, slug, page_id, role)
-                               VALUES ('abc', 'ABD', '00000000-0000-7000-8000-0000000000c1', 'alias')$$,
+                               VALUES ('abc', 'abd', '00000000-0000-7000-8000-0000000000c1', 'alias')$$,
                              'key that does not match the name');
+SELECT internal.test_rejects($$INSERT INTO pages.slugs (slug_key, slug, page_id, role)
+                               VALUES ('capitals', 'Capitals', '00000000-0000-7000-8000-0000000000c1', 'alias')$$,
+                             'a name with capitals');
 SELECT internal.test_rejects($$INSERT INTO pages.slugs (slug_key, slug, page_id, role)
                                VALUES ('second', 'second', '00000000-0000-7000-8000-0000000000c1', 'primary')$$,
                              'second primary name on one page');
@@ -291,7 +312,7 @@ UPDATE pages.slugs SET released_at = now() - interval '100 days', blocked_until 
 
 SET SESSION AUTHORIZATION vrcpage_api;
 UPDATE pages.slugs
-   SET slug = 'ATIAN', page_id = '00000000-0000-7000-8000-0000000000c1', role = 'alias',
+   SET slug = 'atian', page_id = '00000000-0000-7000-8000-0000000000c1', role = 'alias',
        claimed_at = now(), released_at = NULL, blocked_until = NULL
  WHERE slug_key = 'atian' AND page_id IS NULL AND blocked_until < now();
 RESET SESSION AUTHORIZATION;
@@ -300,7 +321,7 @@ DO $$
 BEGIN
   ASSERT (SELECT page_id FROM pages.slugs WHERE slug_key = 'atian') = '00000000-0000-7000-8000-0000000000c1',
     'expired hold reclaimed';
-  RAISE NOTICE 'ok    names: one pool, case-insensitive, held, reclaimable';
+  RAISE NOTICE 'ok    names: one pool, lowercase, held, reclaimable';
 END
 $$;
 

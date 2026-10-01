@@ -12,8 +12,8 @@
  *               share one row
  *   reused      when VRChat gives an address already stored: no download
  *   kept        when a download fails: the old picture beats none
- *   deleted     by the database, the moment no user or group uses it
- *               (migration 20260929130000)
+ *   deleted     by the database, the moment no user, group or page uses it
+ *               (migrations 20260929130000, 20261002090300)
  *   served at   /images/<sha256 hex>.webp on the website, which asks
  *               images.controller.ts
  */
@@ -45,6 +45,36 @@ type Encoded = { sourceUrl: string; sha256: Buffer; bytes: Buffer; width: number
 type Picture = { id: string } | Encoded | null | undefined;
 
 export type Pictures = { icon: Picture; banner: Picture };
+
+/**
+ * A banner someone uploaded on vrc.page, made like a VRChat one: upright,
+ * fitted inside BANNER_BOX, WebP. The first frame of an animation. Null when
+ * sharp can't read it as a picture.
+ */
+export async function encodeUploadedBanner(original: Buffer): Promise<{ sha256: Buffer; bytes: Buffer; width: number; height: number } | null> {
+  try {
+    const { data, info } = await sharp(original, { limitInputPixels: MAX_PIXELS })
+      .rotate()
+      .resize({ width: BANNER_BOX, height: BANNER_BOX, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: QUALITY })
+      .toBuffer({ resolveWithObject: true });
+    return { sha256: createHash('sha256').update(data).digest(), bytes: data, width: info.width, height: info.height };
+  } catch {
+    return null;
+  }
+}
+
+/** Store an uploaded picture, or find the same bytes already stored. Its id. */
+export async function saveUploadedImage(trx: Kysely<DB>, picture: { sha256: Buffer; bytes: Buffer; width: number; height: number }): Promise<string> {
+  const row = await trx
+    .insertInto('vrchat.images')
+    .values({ sha256: picture.sha256, width: picture.width, height: picture.height, byteSize: picture.bytes.length, bytes: picture.bytes, sourceUrl: null })
+    // Same bytes as a picture already stored: share it, changing nothing.
+    .onConflict((oc) => oc.column('sha256').doUpdateSet((eb) => ({ sourceUrl: eb.ref('vrchat.images.sourceUrl') })))
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  return row.id;
+}
 
 /** Where the website serves a stored picture. Relative: it is the website's own address. */
 export function imagePath(sha256: Buffer | null): string | null {

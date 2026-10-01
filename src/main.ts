@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule } from '@nestjs/swagger';
 import { toNodeHandler } from 'better-auth/node';
 import type { Express, NextFunction, Request, Response } from 'express';
@@ -6,6 +7,7 @@ import { AppModule } from './app.module.js';
 import { AuthService } from './auth/auth.service.js';
 import { buildOpenApiDocument, configureRoutes } from './app.setup.js';
 import { ProblemDetailsFilter } from './common/problem-details.filter.js';
+import { UPLOAD_LIMIT, UPLOAD_TYPES } from './common/upload.js';
 import { fromWebsite, requestId } from './common/request-id.js';
 import { AppConfig, loadEnvironmentFile } from './config/app-config.js';
 
@@ -13,7 +15,7 @@ loadEnvironmentFile();
 
 // rawBody: the Resend webhook is signed over the bytes as they arrived,
 // so re-serialising the parsed JSON would fail every signature.
-const app = await NestFactory.create(AppModule, { rawBody: true });
+const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 const config = app.get(AppConfig);
 const express = app.getHttpAdapter().getInstance() as Express;
 express.disable('x-powered-by');
@@ -23,6 +25,11 @@ express.disable('x-powered-by');
 // health checks load balancers make.
 app.use(fromWebsite(config.apiSecret));
 app.use(requestId);
+// Uploads (a page's banner, the media in "What's new") arrive as the file's
+// own bytes, with its type as the Content-Type. Only these types are read
+// this way, and never more than UPLOAD_LIMIT; src/common/upload.ts checks
+// what the bytes really are.
+app.useBodyParser('raw', { type: UPLOAD_TYPES, limit: UPLOAD_LIMIT });
 // Every answer is JSON for the website's server or a redirect: nothing a
 // browser should sniff or a cache should keep.
 app.use((request: Request, response: Response, next: NextFunction) => {

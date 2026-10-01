@@ -11,6 +11,8 @@ export class PageLink {
   source!: 'vrchat' | 'vrcpage';
   /** Marked 18+ by its owner. Always false for VRChat's links; the website also treats OnlyFans and Fansly as 18+. */
   adult!: boolean;
+  /** Its owner chose not to show it. Hidden links never reach a public page; the dashboard lists them so they can be shown again. */
+  hidden!: boolean;
 }
 
 /** One of a page's streams that is live right now. */
@@ -63,6 +65,14 @@ export class UserPage {
   lastRefreshedAt!: string;
   @ApiProperty({ enum: ['public', 'unlisted', 'private'] })
   visibility!: 'public' | 'unlisted' | 'private';
+  /** False when the owner turned the Socials page off. */
+  socialsEnabled!: boolean;
+  /** The page's own accent colour, #rrggbb, or null for vrc.page's. */
+  @ApiProperty({ type: String, nullable: true })
+  accent!: string | null;
+  /** A banner uploaded on vrc.page. `bannerUrl` is VRChat's banner when there is one, and this otherwise. */
+  @ApiProperty({ type: String, nullable: true })
+  ownBannerUrl!: string | null;
 }
 
 export class GroupOwner {
@@ -100,6 +110,14 @@ export class GroupPage {
   lastRefreshedAt!: string;
   @ApiProperty({ enum: ['public', 'unlisted', 'private'] })
   visibility!: 'public' | 'unlisted' | 'private';
+  /** False when the owner turned the Socials page off. */
+  socialsEnabled!: boolean;
+  /** The page's own accent colour, #rrggbb, or null for vrc.page's. */
+  @ApiProperty({ type: String, nullable: true })
+  accent!: string | null;
+  /** A banner uploaded on vrc.page. `bannerUrl` is VRChat's banner when there is one, and this otherwise. */
+  @ApiProperty({ type: String, nullable: true })
+  ownBannerUrl!: string | null;
 }
 
 /**
@@ -107,6 +125,8 @@ export class GroupPage {
  * identical 404, so this can't be used to find out whether a page exists.
  */
 export class PublicPage {
+  /** vrc.page's id for the page, so the website can tell whether the viewer runs it. Not shown to visitors. */
+  pageId!: string;
   @ApiProperty({ enum: ['user', 'group'] })
   kind!: 'user' | 'group';
   /** The page's own name, lowercase. */

@@ -1340,6 +1340,312 @@
         ]
       }
     },
+    "/v1/me/pages/{pageId}/socials": {
+      "put": {
+        "operationId": "pageSettingsSocials",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SocialsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Turn the page's Socials page on or off. Off, its address goes to the profile.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/pages/{pageId}/hidden-links": {
+      "put": {
+        "operationId": "pageSettingsHiddenLink",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HiddenLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Show or hide one of VRChat's links. The page's own links are hidden in the links save.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/pages/{pageId}/accent": {
+      "put": {
+        "operationId": "pageSettingsAccent",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The page's accent colour, #rrggbb, or null for vrc.page's own.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/pages/{pageId}/banner": {
+      "put": {
+        "operationId": "pageSettingsBanner",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/gif": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnBanner"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "A banner of the page's own, shown while VRChat has none: the picture's\nown bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB.",
+        "tags": [
+          "me"
+        ]
+      },
+      "delete": {
+        "operationId": "pageSettingsRemoveBanner",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Take the page's own banner off.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/preferences": {
+      "get": {
+        "operationId": "preferencesPreferences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preferences"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Higher contrast and the dyslexia font.",
+        "tags": [
+          "me"
+        ]
+      },
+      "patch": {
+        "operationId": "preferencesSetPreferences",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencesPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preferences"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change some of them; the answer is all of them.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
     "/v1/me/vrchat/claims/{kind}": {
       "get": {
         "operationId": "claimsPending",
@@ -1562,6 +1868,117 @@
         "summary": "One stored icon or banner, as WebP.\n\nNot rate limited: it is one indexed read by hash, and most of these come\nfrom the website's image optimizer, all from one address, so a limit\nper address would throttle every visitor together.",
         "tags": [
           "pages"
+        ]
+      }
+    },
+    "/v1/updates/media/{file}": {
+      "get": {
+        "operationId": "newsMediaMedia",
+        "parameters": [
+          {
+            "name": "file",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "video/mp4": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "video/webm": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One picture (WebP) or clip (MP4, WebM) from an update. Not rate limited, like page pictures.",
+        "tags": [
+          "updates"
+        ]
+      }
+    },
+    "/v1/me/updates": {
+      "get": {
+        "operationId": "myUpdatesFeed",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatesFeed"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The latest published updates, and which of them are new to this account.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/updates/seen": {
+      "post": {
+        "operationId": "myUpdatesSeen",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Everything published so far has been seen.",
+        "tags": [
+          "me"
         ]
       }
     },
@@ -2245,6 +2662,321 @@
         ]
       }
     },
+    "/v1/admin/updates": {
+      "get": {
+        "operationId": "adminUpdatesList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUpdateList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Every update, drafts included, newest first.",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "adminUpdatesCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUpdate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start one, as a draft.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/updates/{id}": {
+      "get": {
+        "operationId": "adminUpdatesOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUpdate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One update.",
+        "tags": [
+          "admin"
+        ]
+      },
+      "patch": {
+        "operationId": "adminUpdatesChange",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUpdate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change its words, or publish or unpublish it.",
+        "tags": [
+          "admin"
+        ]
+      },
+      "delete": {
+        "operationId": "adminUpdatesRemove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete it, and its picture or clip if nothing else uses that.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/updates/{id}/media": {
+      "put": {
+        "operationId": "adminUpdatesMedia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/gif": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "video/mp4": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "video/webm": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUpdate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Its picture or clip: the file's own bytes as the body. PNG, JPEG, WebP\nand GIF become WebP (animation kept); MP4 and WebM are kept as sent. Up\nto 25 MB.",
+        "tags": [
+          "admin"
+        ]
+      },
+      "delete": {
+        "operationId": "adminUpdatesClearMedia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUpdate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Take its picture or clip off.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/v1/dev/vrchat/world": {
       "get": {
         "operationId": "devWorld",
@@ -2880,13 +3612,18 @@
           "adult": {
             "type": "boolean",
             "description": "Marked 18+ by its owner. Always false for VRChat's links; the website also treats OnlyFans and Fansly as 18+."
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "Its owner chose not to show it. Hidden links never reach a public page; the dashboard lists them so they can be shown again."
           }
         },
         "required": [
           "label",
           "source",
           "url",
-          "adult"
+          "adult",
+          "hidden"
         ]
       },
       "UserPage": {
@@ -2945,6 +3682,16 @@
             ],
             "type": "string"
           },
+          "accent": {
+            "type": "string",
+            "nullable": true,
+            "description": "The page's own accent colour, #rrggbb, or null for vrc.page's."
+          },
+          "ownBannerUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "A banner uploaded on vrc.page. `bannerUrl` is VRChat's banner when there is one, and this otherwise."
+          },
           "vrchatUserId": {
             "type": "string"
           },
@@ -2974,6 +3721,10 @@
           "lastRefreshedAt": {
             "type": "string",
             "description": "Last successful read from VRChat: ISO 8601."
+          },
+          "socialsEnabled": {
+            "type": "boolean",
+            "description": "False when the owner turned the Socials page off."
           }
         },
         "required": [
@@ -2986,13 +3737,16 @@
           "bannerUrl",
           "avatarUrl",
           "visibility",
+          "accent",
+          "ownBannerUrl",
           "vrchatUserId",
           "displayName",
           "ageVerified",
           "links",
           "languages",
           "verifiedAt",
-          "lastRefreshedAt"
+          "lastRefreshedAt",
+          "socialsEnabled"
         ]
       },
       "GroupOwner": {
@@ -3051,6 +3805,16 @@
             ],
             "type": "string"
           },
+          "accent": {
+            "type": "string",
+            "nullable": true,
+            "description": "The page's own accent colour, #rrggbb, or null for vrc.page's."
+          },
+          "ownBannerUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "A banner uploaded on vrc.page. `bannerUrl` is VRChat's banner when there is one, and this otherwise."
+          },
           "vrchatGroupId": {
             "type": "string"
           },
@@ -3086,6 +3850,10 @@
           },
           "lastRefreshedAt": {
             "type": "string"
+          },
+          "socialsEnabled": {
+            "type": "boolean",
+            "description": "False when the owner turned the Socials page off."
           }
         },
         "required": [
@@ -3096,6 +3864,8 @@
           "bannerUrl",
           "owner",
           "visibility",
+          "accent",
+          "ownBannerUrl",
           "vrchatGroupId",
           "name",
           "shortCode",
@@ -3104,7 +3874,8 @@
           "languages",
           "isVerified",
           "verifiedAt",
-          "lastRefreshedAt"
+          "lastRefreshedAt",
+          "socialsEnabled"
         ]
       },
       "LiveStream": {
@@ -3154,6 +3925,10 @@
               "$ref": "#/components/schemas/LiveStream"
             }
           },
+          "pageId": {
+            "type": "string",
+            "description": "vrc.page's id for the page, so the website can tell whether the viewer runs it. Not shown to visitors."
+          },
           "slug": {
             "type": "string",
             "description": "The page's own name, lowercase."
@@ -3170,6 +3945,7 @@
         "required": [
           "kind",
           "live",
+          "pageId",
           "slug",
           "alias",
           "redirect"
@@ -3604,13 +4380,18 @@
           "adult": {
             "type": "boolean",
             "description": "Marked 18+. Visitors confirm before it opens."
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "Kept on the list but not shown to visitors."
           }
         },
         "required": [
           "label",
           "id",
           "url",
-          "adult"
+          "adult",
+          "hidden"
         ]
       },
       "PageLinks": {
@@ -3618,7 +4399,7 @@
         "properties": {
           "max": {
             "type": "integer",
-            "description": "Links one page may add, from links.custom.max_per_page."
+            "description": "Links one page may add, from links.custom.max_per_page: a ceiling against abuse, not a limit to show."
           },
           "labelMax": {
             "type": "integer",
@@ -3653,6 +4434,10 @@
             "type": "boolean",
             "description": "Marks the link 18+. Defaults to false."
           },
+          "hidden": {
+            "type": "boolean",
+            "description": "Keeps the link off the public page. Defaults to false."
+          },
           "url": {
             "type": "string",
             "description": "What was typed. A missing scheme means https; anything else is refused."
@@ -3675,6 +4460,86 @@
         "required": [
           "links"
         ]
+      },
+      "SocialsRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "HiddenLinkRequest": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The link as the page lists it."
+          },
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "url",
+          "hidden"
+        ]
+      },
+      "AccentRequest": {
+        "type": "object",
+        "properties": {
+          "accent": {
+            "type": "string",
+            "nullable": true,
+            "description": "#rrggbb, or null for vrc.page's own."
+          }
+        },
+        "required": [
+          "accent"
+        ]
+      },
+      "OwnBanner": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "/images/<sha256 hex>.webp on the website."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "Preferences": {
+        "type": "object",
+        "properties": {
+          "highContrast": {
+            "type": "boolean",
+            "description": "Stronger text and outlines everywhere."
+          },
+          "dyslexiaFont": {
+            "type": "boolean",
+            "description": "OpenDyslexic for all text."
+          }
+        },
+        "required": [
+          "highContrast",
+          "dyslexiaFont"
+        ]
+      },
+      "PreferencesPatch": {
+        "type": "object",
+        "properties": {
+          "highContrast": {
+            "type": "boolean"
+          },
+          "dyslexiaFont": {
+            "type": "boolean"
+          }
+        }
       },
       "PendingClaim": {
         "type": "object",
@@ -3781,6 +4646,67 @@
         },
         "required": [
           "status"
+        ]
+      },
+      "Update": {
+        "type": "object",
+        "properties": {
+          "mediaUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "/updates/media/<sha256 hex>.<webp|mp4|webm> on the website, or null."
+          },
+          "mediaKind": {
+            "nullable": true,
+            "enum": [
+              "image",
+              "video"
+            ],
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When it went out: ISO 8601. Null while it is a draft."
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "description": "Plain text with its line breaks."
+          }
+        },
+        "required": [
+          "mediaUrl",
+          "mediaKind",
+          "publishedAt",
+          "id",
+          "title",
+          "body"
+        ]
+      },
+      "UpdatesFeed": {
+        "type": "object",
+        "properties": {
+          "updates": {
+            "description": "Published updates, newest first, at most ten.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Update"
+            }
+          },
+          "seenAt": {
+            "type": "string",
+            "description": "Updates published after this are new to the account: ISO 8601."
+          }
+        },
+        "required": [
+          "updates",
+          "seenAt"
         ]
       },
       "AdminAccountRow": {
@@ -4222,6 +5148,100 @@
         "required": [
           "redirect"
         ]
+      },
+      "AdminUpdate": {
+        "type": "object",
+        "properties": {
+          "mediaUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "/updates/media/<sha256 hex>.<webp|mp4|webm> on the website, or null."
+          },
+          "mediaKind": {
+            "nullable": true,
+            "enum": [
+              "image",
+              "video"
+            ],
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When it went out: ISO 8601. Null while it is a draft."
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "description": "Plain text with its line breaks."
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mediaUrl",
+          "mediaKind",
+          "publishedAt",
+          "id",
+          "title",
+          "body",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AdminUpdateList": {
+        "type": "object",
+        "properties": {
+          "updates": {
+            "description": "Every update, drafts included, newest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUpdate"
+            }
+          }
+        },
+        "required": [
+          "updates"
+        ]
+      },
+      "UpdateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ]
+      },
+      "UpdatePatch": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "published": {
+            "type": "boolean",
+            "description": "True publishes it (keeping the first publish time); false makes it a draft again."
+          }
+        }
       },
       "FakeUserView": {
         "type": "object",

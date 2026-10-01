@@ -137,6 +137,18 @@ export interface AuditRowChanges {
   txId: Int8;
 }
 
+export interface AuthAccountPreferences {
+  accountId: string;
+  createdAt: Generated<Timestamp>;
+  dyslexiaFont: Generated<boolean>;
+  highContrast: Generated<boolean>;
+  updatedAt: Generated<Timestamp>;
+  /**
+   * Updates published after this are new to the account. NULL: its creation time.
+   */
+  updatesSeenAt: Timestamp | null;
+}
+
 export interface AuthAccountRoles {
   accountId: string;
   grantedAt: Generated<Timestamp>;
@@ -368,6 +380,28 @@ export interface ModerationReports {
   updatedAt: Generated<Timestamp>;
 }
 
+export interface NewsMedia {
+  bytes: Buffer;
+  byteSize: number;
+  contentType: string;
+  createdAt: Generated<Timestamp>;
+  height: number | null;
+  id: Generated<string>;
+  sha256: Buffer;
+  width: number | null;
+}
+
+export interface NewsUpdates {
+  body: string;
+  createdAt: Generated<Timestamp>;
+  createdBy: string | null;
+  id: Generated<string>;
+  mediaId: string | null;
+  publishedAt: Timestamp | null;
+  title: string;
+  updatedAt: Generated<Timestamp>;
+}
+
 export interface PagesCustomDomains {
   createdAt: Generated<Timestamp>;
   hostname: string;
@@ -400,6 +434,12 @@ export interface PagesEditors {
   pageId: string;
 }
 
+export interface PagesHiddenLinks {
+  createdAt: Generated<Timestamp>;
+  identity: string;
+  pageId: string;
+}
+
 export interface PagesLinks {
   createdAt: Generated<Timestamp>;
   id: Generated<string>;
@@ -407,6 +447,10 @@ export interface PagesLinks {
    * Marked 18+ by the page's owner or an editor. Visitors confirm before it opens.
    */
   isAdult: Generated<boolean>;
+  /**
+   * Kept on the page's list but not shown to visitors.
+   */
+  isHidden: Generated<boolean>;
   label: string | null;
   pageId: string;
   position: number;
@@ -433,6 +477,14 @@ export interface PagesPageOverview {
 }
 
 export interface PagesPages {
+  /**
+   * The page's accent colour, #rrggbb. NULL: vrc.page's own.
+   */
+  accent: string | null;
+  /**
+   * A banner uploaded on vrc.page, shown only while VRChat has none.
+   */
+  bannerImageId: string | null;
   createdAt: Generated<Timestamp>;
   /**
    * Moderator takedown. The owner cannot undo it.
@@ -453,6 +505,10 @@ export interface PagesPages {
    * When the primary name last changed; the rename cooldown counts from here.
    */
   slugChangedAt: Timestamp | null;
+  /**
+   * False: no Socials page; vrc.page/<name>/socials goes to the profile.
+   */
+  socialsEnabled: Generated<boolean>;
   updatedAt: Generated<Timestamp>;
   visibility: Generated<PagesVisibility>;
   vrchatGroupId: string | null;
@@ -599,9 +655,9 @@ export interface VrchatImages {
   id: Generated<string>;
   sha256: Buffer;
   /**
-   * The address VRChat gave for this picture most recently. A refresh that sees it again downloads nothing.
+   * The address VRChat gave for this picture most recently. A refresh that sees it again downloads nothing. NULL for a banner uploaded on vrc.page.
    */
-  sourceUrl: string;
+  sourceUrl: string | null;
   width: number;
 }
 
@@ -662,6 +718,7 @@ export interface VrchatUsers {
 export interface DB {
   "audit.events": AuditEvents;
   "audit.rowChanges": AuditRowChanges;
+  "auth.accountPreferences": AuthAccountPreferences;
   "auth.accountRoles": AuthAccountRoles;
   "auth.accounts": AuthAccounts;
   "auth.identities": AuthIdentities;
@@ -679,9 +736,12 @@ export interface DB {
   "moderation.banEvidence": ModerationBanEvidence;
   "moderation.bans": ModerationBans;
   "moderation.reports": ModerationReports;
+  "news.media": NewsMedia;
+  "news.updates": NewsUpdates;
   "pages.customDomains": PagesCustomDomains;
   "pages.editorInvites": PagesEditorInvites;
   "pages.editors": PagesEditors;
+  "pages.hiddenLinks": PagesHiddenLinks;
   "pages.links": PagesLinks;
   "pages.pageOverview": PagesPageOverview;
   "pages.pages": PagesPages;

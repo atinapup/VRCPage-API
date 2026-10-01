@@ -9,12 +9,14 @@ export class OwnLink {
   label!: string | null;
   /** Marked 18+. Visitors confirm before it opens. */
   adult!: boolean;
+  /** Kept on the list but not shown to visitors. */
+  hidden!: boolean;
 }
 
 /** A page's own links, in the order they are shown. */
 export class PageLinks {
   links!: OwnLink[];
-  /** Links one page may add, from links.custom.max_per_page. */
+  /** Links one page may add, from links.custom.max_per_page: a ceiling against abuse, not a limit to show. */
   @ApiProperty({ type: 'integer' })
   max!: number;
   /** Longest label, in characters. */
@@ -33,6 +35,9 @@ export class LinkInput {
   /** Marks the link 18+. Defaults to false. */
   @ApiProperty({ type: Boolean, required: false })
   adult?: boolean;
+  /** Keeps the link off the public page. Defaults to false. */
+  @ApiProperty({ type: Boolean, required: false })
+  hidden?: boolean;
 }
 
 /**

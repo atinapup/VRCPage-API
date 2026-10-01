@@ -7,7 +7,7 @@ import { Database } from '../database/database.js';
 import { MailService } from '../mail/mail.service.js';
 import type { DB } from '../database/database.types.js';
 import { imagePath } from '../vrchat/images.js';
-import { checkLink } from './links.js';
+import { checkLink, linkIdentity } from './links.js';
 import { liveStreams } from './streams.js';
 import type {
   Dashboard,
@@ -123,14 +123,19 @@ export class PagesService {
   /**
    * VRChat's links first, then the page's own, in order. VRChat's are stored
    * as VRChat sent them, so they pass the same check as ours on the way out:
-   * only plain https ever reaches a page.
+   * only plain https ever reaches a page. Hidden ones are marked, not left
+   * out: the owner's own lists show them, and publicPage() leaves them out.
    */
   private async links(pageId: string, fromVRChat: string[]): Promise<PageLink[]> {
-    const own = await this.db.selectFrom('pages.links').select(['url', 'label', 'isAdult']).where('pageId', '=', pageId).orderBy('position').execute();
+    const [own, hidden] = await Promise.all([
+      this.db.selectFrom('pages.links').select(['url', 'label', 'isAdult', 'isHidden']).where('pageId', '=', pageId).orderBy('position').execute(),
+      this.db.selectFrom('pages.hiddenLinks').select('identity').where('pageId', '=', pageId).execute(),
+    ]);
+    const hiddenVRChat = new Set(hidden.map((row) => row.identity));
     const checked = fromVRChat.map((raw) => checkLink(raw, NOTHING_BLOCKED)).filter((link) => link.status === 'ok');
     return [
-      ...checked.map(({ url }) => ({ url, label: null, source: 'vrchat' as const, adult: false })),
-      ...own.map((link) => ({ url: link.url, label: link.label, source: 'vrcpage' as const, adult: link.isAdult })),
+      ...checked.map(({ url }) => ({ url, label: null, source: 'vrchat' as const, adult: false, hidden: hiddenVRChat.has(linkIdentity(url)) })),
+      ...own.map((link) => ({ url: link.url, label: link.label, source: 'vrcpage' as const, adult: link.isAdult, hidden: link.isHidden })),
     ];
   }
 
@@ -140,8 +145,12 @@ export class PagesService {
       .innerJoin('vrchat.users as u', 'u.id', 'p.vrchatUserId')
       .leftJoin('vrchat.images as icon', 'icon.id', 'u.iconImageId')
       .leftJoin('vrchat.images as banner', 'banner.id', 'u.bannerImageId')
+      .leftJoin('vrchat.images as ownBanner', 'ownBanner.id', 'p.bannerImageId')
       .select([
         'p.visibility',
+        'p.socialsEnabled',
+        'p.accent',
+        'ownBanner.sha256 as ownBannerSha256',
         'u.id',
         'u.displayName',
         'u.pronouns',
@@ -178,11 +187,15 @@ export class PagesService {
       bio: row.bio || null,
       links: await this.links(pageId, row.bioLinks),
       languages: row.languages,
-      bannerUrl: imagePath(row.bannerSha256),
+      // VRChat's banner wins; the page's own is for when VRChat has none.
+      bannerUrl: imagePath(row.bannerSha256 ?? row.ownBannerSha256),
       avatarUrl: imagePath(row.iconSha256),
       verifiedAt: row.connectedAt.toISOString(),
       lastRefreshedAt: row.fetchedAt.toISOString(),
       visibility: row.visibility,
+      socialsEnabled: row.socialsEnabled,
+      accent: row.accent,
+      ownBannerUrl: imagePath(row.ownBannerSha256),
     };
   }
 
@@ -194,8 +207,12 @@ export class PagesService {
       .leftJoin('pages.pages as ownerPage', 'ownerPage.vrchatUserId', 'claimer.id')
       .leftJoin('vrchat.images as icon', 'icon.id', 'g.iconImageId')
       .leftJoin('vrchat.images as banner', 'banner.id', 'g.bannerImageId')
+      .leftJoin('vrchat.images as ownBanner', 'ownBanner.id', 'p.bannerImageId')
       .select([
         'p.visibility',
+        'p.socialsEnabled',
+        'p.accent',
+        'ownBanner.sha256 as ownBannerSha256',
         'g.id',
         'g.name',
         'g.shortCode',
@@ -232,11 +249,15 @@ export class PagesService {
       memberCount: row.memberCount,
       isVerified: row.isVerified,
       iconUrl: imagePath(row.iconSha256),
-      bannerUrl: imagePath(row.bannerSha256),
+      // VRChat's banner wins; the page's own is for when VRChat has none.
+      bannerUrl: imagePath(row.bannerSha256 ?? row.ownBannerSha256),
       owner: { displayName: row.ownerName, slug: ownerPublic ? await this.primarySlug(row.ownerPageId!) : null },
       verifiedAt: row.claimedAt.toISOString(),
       lastRefreshedAt: row.fetchedAt.toISOString(),
       visibility: row.visibility,
+      socialsEnabled: row.socialsEnabled,
+      accent: row.accent,
+      ownBannerUrl: imagePath(row.ownBannerSha256),
     };
   }
 
@@ -258,12 +279,17 @@ export class PagesService {
     const alias = found.role === 'alias';
     const redirect = alias && found.isRedirect;
 
+    // Hidden links stay with the owner: nothing about them leaves here.
     if (found.kind === 'user') {
       const user = await this.userPage(found.id);
-      return user ? { kind: 'user', slug: primary, alias, redirect, user, live: await liveStreams(user.links) } : null;
+      if (!user) return null;
+      user.links = user.links.filter((link) => !link.hidden);
+      return { pageId: found.id, kind: 'user', slug: primary, alias, redirect, user, live: await liveStreams(user.links) };
     }
     const group = await this.groupPage(found.id);
-    return group ? { kind: 'group', slug: primary, alias, redirect, group, live: await liveStreams(group.links) } : null;
+    if (!group) return null;
+    group.links = group.links.filter((link) => !link.hidden);
+    return { pageId: found.id, kind: 'group', slug: primary, alias, redirect, group, live: await liveStreams(group.links) };
   }
 
   /**
@@ -285,7 +311,9 @@ export class PagesService {
       .executeTakeFirst();
     if (!found) return null;
     const user = await this.userPage(found.id);
-    return user ? { kind: 'user', slug: found.slug, alias: false, redirect: false, user, live: [] } : null;
+    if (!user) return null;
+    user.links = user.links.filter((link) => !link.hidden);
+    return { pageId: found.id, kind: 'user', slug: found.slug, alias: false, redirect: false, user, live: [] };
   }
 
   /* The signed-in account's own pages ------------------------------------- */

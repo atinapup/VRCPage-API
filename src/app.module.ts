@@ -10,6 +10,7 @@ import { DatabaseModule } from './database/database.module.js';
 import { DevModule } from './dev/dev.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MailModule } from './mail/mail.module.js';
+import { NewsModule } from './news/news.module.js';
 import { PagesModule } from './pages/pages.module.js';
 import { VRChatModule } from './vrchat/vrchat.module.js';
 
@@ -22,6 +23,7 @@ import { VRChatModule } from './vrchat/vrchat.module.js';
     AuthModule,
     HealthModule,
     PagesModule,
+    NewsModule,
     AdminModule,
     VRChatModule,
     // Test-data shortcuts. Never registered in production, so those routes don't exist there.

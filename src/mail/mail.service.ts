@@ -32,6 +32,9 @@ const BACKOFF_MINUTES = (attempts: number) => 5 ** (attempts - 1);
 /** Which switch in Settings turns an email off. Auth and account mail has none: it always goes. */
 type Preference = 'notifyGroupInvites' | 'notifyPageChanges' | 'notifyProductNews';
 
+/** The column defaults of auth.notification_preferences, for an account with no row. */
+const DEFAULTS: Record<Preference, boolean> = { notifyGroupInvites: true, notifyPageChanges: true, notifyProductNews: false };
+
 export type Letter<K extends TemplateName = TemplateName> = {
   to: string;
   /** Who it is about, for the record. Null for someone with no account (or one just deleted). */
@@ -140,7 +143,9 @@ export class MailService implements OnApplicationBootstrap, OnApplicationShutdow
 
   private async wants(accountId: string, preference: Preference): Promise<boolean> {
     const row = await this.db.selectFrom('auth.notificationPreferences').select(preference).where('accountId', '=', accountId).executeTakeFirst();
-    return row ? row[preference] : true; // No row means the defaults, which are on.
+    // No row means the defaults (auth.notification_preferences): on, except
+    // product news, which nobody gets without asking for it.
+    return row ? row[preference] : DEFAULTS[preference];
   }
 
   /**

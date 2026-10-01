@@ -138,7 +138,9 @@ A page shows VRChat's links first, then the ones added on vrc.page. `PUT /v1/me/
 - **A link can be marked 18+** with `adult: true`. `PageLink.adult` carries it to the website, which also treats every OnlyFans and Fansly link as 18+ and asks visitors to confirm before opening one.
 - **The same link twice is refused**, by one identity rule: the host with or without www, the path with or without a trailing slash, and the query.
 - **A row keeps its id while its address stays the same**, so a reorder or a new label is an update, and only a link that really came or went is recorded as `link_item.added` or `link_item.removed`.
-- Limits come from `links.custom.*`: 8 links, 40-character labels, and a switch to turn adding off.
+- **A link can be hidden**: the page's own with `hidden: true` in the save, VRChat's with `PUT /v1/me/pages/{pageId}/hidden-links` (`{url, hidden}`), remembered by link identity in `pages.hidden_links` since those have no row of their own. `PageLink.hidden` marks them for the owner's lists; `GET /v1/pages/{slug}` leaves them out, so a hidden link never reaches a visitor.
+- **The Socials page can be turned off** with `PUT /v1/me/pages/{pageId}/socials` (`{enabled}`). Pages carry `socialsEnabled`; off, the website sends its links address to the profile.
+- Limits come from `links.custom.*`: 40-character labels, a switch to turn adding off, and a ceiling of 100 links a page that is there against abuse rather than as a limit to show.
 
 `GET /v1/pages/{slug}` also answers `live`: the page's VRCDN streams that are live right now (`src/pages/streams.ts`). Each is asked about at most every 30 seconds, by requesting its MPEG-TS address with a 2-second timeout, so a slow VRCDN costs a page two seconds at most and never fails it. Twitch and YouTube need developer keys and are not checked yet.
 
@@ -162,7 +164,7 @@ Some changes need rules of their own:
 
 ### Refusals a client can act on
 
-Beyond the status code, `type` names the kind: `https://vrc.page/problems/<code>`, with one of the codes in `src/common/problem.ts` — `bot_check_failed`, `cooldown` (with `retryAfter`), `invalid_email`, `same_email`, `email_taken`, `signups_closed`, `pending_expired`, `wrong_code`, `code_expired`, `code_exhausted`, `provider_not_configured`, `not_connected`, `not_allowed`, `invalid_link`, `short_link`, `already_connected`, `vrchat_taken`, `vrchat_not_found`, `group_taken`, `not_group_owner`, `group_private`, `group_limit`, `no_such_page`, `invite_self`, `already_editor`, `already_invited`, `editor_limit`, `links_disabled`, `too_many_links`, `link_invalid`, `link_blocked`, `link_duplicate`, `link_stream_key`, `label_too_long`, `refresh_cooldown` (with `retryAfter`), `refresh_daily_limit`, `vrchat_gone`, `group_unclaimed`, `name_unavailable`, `name_cooldown`, `session_stale`, `not_signed_in`, `unavailable`. Anything else is `about:blank`, where the status says it all. A refusal about one item of a submitted list also carries `at`, that item's position counting from 0.
+Beyond the status code, `type` names the kind: `https://vrc.page/problems/<code>`, with one of the codes in `src/common/problem.ts` — `bot_check_failed`, `cooldown` (with `retryAfter`), `invalid_email`, `same_email`, `email_taken`, `signups_closed`, `pending_expired`, `wrong_code`, `code_expired`, `code_exhausted`, `provider_not_configured`, `not_connected`, `not_allowed`, `invalid_link`, `short_link`, `already_connected`, `vrchat_taken`, `vrchat_not_found`, `group_taken`, `not_group_owner`, `group_private`, `group_limit`, `no_such_page`, `invite_self`, `already_editor`, `already_invited`, `editor_limit`, `links_disabled`, `too_many_links`, `link_invalid`, `link_blocked`, `link_duplicate`, `link_stream_key`, `label_too_long`, `not_a_picture`, `too_large`, `refresh_cooldown` (with `retryAfter`), `refresh_daily_limit`, `vrchat_gone`, `group_unclaimed`, `name_unavailable`, `name_cooldown`, `session_stale`, `not_signed_in`, `unavailable`. Anything else is `about:blank`, where the status says it all. A refusal about one item of a submitted list also carries `at`, that item's position counting from 0.
 
 ## Reading VRChat
 
@@ -217,7 +219,21 @@ VRChat icons and banners are copied, never linked: a public page must not make a
 - **Stored as** WebP, fitted inside 512px (icons) or 1600px (banners), named by the sha256 of those bytes. Two people with the same picture share one row.
 - **Kept when a download fails.** The old picture beats none; a picture VRChat no longer has is removed.
 - **Deleted by the database.** A trigger (`internal.drop_unused_images`, migration `20260929130000`) deletes a picture the moment no user or group uses it, which covers a changed picture, a disconnect, an unclaimed group and a deleted account, whose cascade arrives there too. Users and groups hold their pictures with `ON DELETE RESTRICT`, so nothing can delete one still on a page.
+- **Uploaded banners** (`PUT /v1/me/pages/{pageId}/banner`, the picture's own bytes as the body, PNG, JPEG, WebP or GIF up to 8 MB) go through the same encoding, are stored with no `source_url`, and hang off `pages.pages.banner_image_id`. A page shows VRChat's banner when there is one and its own otherwise (`bannerUrl`; `ownBannerUrl` is the uploaded one). The clean-up trigger checks pages' own banners too (migration `20261002090300`).
 - **Served** by `GET /v1/images/{sha256 hex}.webp` with a thirty-day `Cache-Control`, and the website serves that at `/images/<file>`. Pages get the relative address, which `next/image` optimizes like any local picture. Thirty days is the spec's limit for a deleted account's pictures leaving every cache. The route is not rate limited: it is one indexed read, and most requests come from the website's optimizer, all from one address.
+
+## Appearance and accessibility
+
+- **A page's accent colour** is `PUT /v1/me/pages/{pageId}/accent` (`{accent: "#rrggbb" | null}`), owners and editors. Pages carry `accent`; the website works the page's whole palette out from it.
+- **How the site looks for one account** is `GET` / `PATCH /v1/me/preferences`: `highContrast` and `dyslexiaFont`, kept in `auth.account_preferences`. The website mirrors them into a cookie of its own so they apply before a page is drawn.
+
+## What's new
+
+Short notes about changes to vrc.page, in the `news` schema. Admins write them through `/v1/admin/updates` (create as a draft, change, publish or unpublish with `published`, delete) and attach one picture or clip with `PUT /v1/admin/updates/{id}/media`, the file's own bytes as the body:
+
+- **Pictures** (PNG, JPEG, WebP, GIF) are re-encoded to WebP with sharp, fitted inside 1600px, keeping a GIF's animation. **Clips** (MP4, WebM) are stored as sent. Either is checked by its first bytes, never its claimed type, and is at most 25 MB (`main.ts` reads only these types as raw bytes, and no more than that).
+- **Served** by `GET /v1/updates/media/{sha256 hex}.{webp|mp4|webm}`, immutable, which the website serves at `/updates/media/<file>` with byte ranges for Safari. A picture or clip no update uses any more is deleted with it.
+- **Each account sees an update once.** `GET /v1/me/updates` answers the latest ten published and `seenAt`; the website shows the ones published after it, and `POST /v1/me/updates/seen` moves it on. An account that has never looked starts at its own creation, so new accounts aren't greeted with old news.
 
 ## Two database logins, and why readiness checks both
 
@@ -289,6 +305,14 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `GET /v1/me/page` | The account's own page, whatever its visibility |
 | `GET /v1/me/groups/{pageId}` | A group it owns or edits; any other id is a 404 |
 | `GET /v1/me/notification-preferences` | Which emails it gets |
+| `GET`, `PATCH /v1/me/preferences` | Higher contrast and the dyslexia font, for this account |
+| `GET /v1/me/updates` | The latest "What's new" updates, and how far this account has read |
+| `POST /v1/me/updates/seen` | Everything published so far has been seen |
+| `GET /v1/updates/media/{file}` | A picture or clip from an update |
+| `PUT /v1/me/pages/{pageId}/socials` | Turn the page's Socials page on or off. Owners and editors |
+| `PUT /v1/me/pages/{pageId}/hidden-links` | Show or hide one of VRChat's links on the page. Owners and editors |
+| `PUT /v1/me/pages/{pageId}/accent` | The page's accent colour, or null. Owners and editors |
+| `PUT`, `DELETE /v1/me/pages/{pageId}/banner` | A banner of the page's own, for when VRChat has none. Owners and editors |
 | `PUT /v1/me/pages/{pageId}/visibility` | Public, unlisted or private. Owners only; an editor gets `not_allowed` |
 | `PATCH /v1/me/notification-preferences` | Change some of them; the answer is all of them |
 | `DELETE /v1/me/vrchat` | Disconnect VRChat, which takes the page and its groups with it |
@@ -318,6 +342,9 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `GET /v1/admin/pages/{pageId}` | Admins: one page with its owner, aliases, takedown and whether it is a home page example |
 | `PUT`, `DELETE /v1/admin/pages/{pageId}/hidden` | Admins: take it down with a reason, or put it back |
 | `PUT`, `DELETE /v1/admin/pages/{pageId}/showcase` | Admins: pick a person's page as a home page example, or drop it |
+| `GET`, `POST /v1/admin/updates` | Admins: every "What's new" update, or a new draft |
+| `GET`, `PATCH`, `DELETE /v1/admin/updates/{id}` | Admins: one update; change, publish or unpublish it, or delete it |
+| `PUT`, `DELETE /v1/admin/updates/{id}/media` | Admins: its picture or clip |
 | `POST /v1/admin/pages/{pageId}/aliases` | Admins: give it another name, which redirects or shows the page |
 | `PATCH`, `DELETE /v1/admin/pages/{pageId}/aliases/{name}` | Admins: flip an alias's redirect, or remove it |
 | `POST /v1/webhooks/resend` | Resend's delivery events. Signed; not in `openapi.json` |
