@@ -13,7 +13,7 @@
  *            from connecting an account to adding a group can be made again.
  */
 
-import type { ReadResult, VRChatGroup, VRChatUser } from './types.js';
+import type { ReadResult, VRChatGroup, VRChatPresence, VRChatUser } from './types.js';
 
 /*
  * The test records answer in exactly the shape the real client does, so
@@ -73,6 +73,7 @@ export const FAKE_USERS: Record<'mira' | 'juniper' | 'orin' | 'kestrel', FakeUse
     bioLinks: ['https://www.twitch.tv/miravr', 'https://ko-fi.com/miravr'],
     pronouns: 'she/her',
     status: 'join_me',
+    statusDescription: 'at the market',
     isAgeVerified: true,
     trustRank: 'Trusted User',
     representedGroup: { id: FAKE_IDS.nightMarket, name: 'Night Market' },
@@ -83,6 +84,7 @@ export const FAKE_USERS: Record<'mira' | 'juniper' | 'orin' | 'kestrel', FakeUse
     displayName: 'Juniper',
     bio: 'Builds worlds, occasionally finishes one.',
     status: 'active',
+    statusDescription: 'baking lights',
     trustRank: 'Known User',
     languages: ['English'],
   }),
@@ -94,6 +96,7 @@ export const FAKE_USERS: Record<'mira' | 'juniper' | 'orin' | 'kestrel', FakeUse
     bio: 'Runs Neon Nights every Friday at 21:00 UTC.',
     pronouns: 'she/her',
     status: 'active',
+    statusDescription: 'hosting in the main hall',
     isAgeVerified: true,
     trustRank: 'Trusted User',
     languages: ['English'],
@@ -201,7 +204,18 @@ function answer<T>(value: T | undefined): ReadResult<T> {
 }
 
 export const fakeReader = {
-  getUser: (id: string): ReadResult<FakeUser> => answer(world.users.get(key(id))),
+  // As VRChat's profile endpoint answers anyone but the profile's owner:
+  // without status, status line or trust rank. getUserStatus has those.
+  getUser: (id: string): ReadResult<FakeUser> => {
+    const read = answer(world.users.get(key(id)));
+    return read.ok ? { ok: true, value: { ...read.value, status: null, statusDescription: null, trustRank: null } } : read;
+  },
+  getUserStatus: (id: string): ReadResult<VRChatPresence> => {
+    const read = answer(world.users.get(key(id)));
+    if (!read.ok) return read;
+    const { status, statusDescription, trustRank } = read.value;
+    return { ok: true, value: { status: status ?? 'offline', statusDescription, trustRank } };
+  },
   getGroup: (id: string): ReadResult<FakeGroup> => answer(world.groups.get(key(id))),
 };
 

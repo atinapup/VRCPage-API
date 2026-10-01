@@ -5,7 +5,7 @@ import type { RequestContext } from '../common/request-context.js';
 import { sniff } from '../common/upload.js';
 import { Database } from '../database/database.js';
 import type { DB } from '../database/database.types.js';
-import { encodeUploadedBanner, imagePath, saveUploadedImage } from '../vrchat/images.js';
+import { encodeUpload, imagePath, saveUploadedImage } from '../vrchat/images.js';
 import { checkLink, linkIdentity } from './links.js';
 import type { Preferences } from './page-settings.dto.js';
 import { PagesService } from './pages.service.js';
@@ -13,7 +13,7 @@ import { PagesService } from './pages.service.js';
 /*
  * What an owner decides about how their page looks and what it shows, beyond
  * its name and who can open it: the Socials page, which of VRChat's links
- * show, an accent colour, and a banner for when VRChat has none. Owners and
+ * show, an accent colour, and a picture and banner of its own. Owners and
  * editors may both change these, the same as links: they are how the page
  * looks, not who it belongs to. And how vrc.page itself looks for one
  * account: higher contrast and a dyslexia font.
@@ -22,13 +22,18 @@ import { PagesService } from './pages.service.js';
 /** #rrggbb, lowercase on the way in. */
 const ACCENT = /^#[0-9a-f]{6}$/;
 
-/** A banner is a picture, and none needs to be bigger than this to look right. */
-export const BANNER_LIMIT = 8 * 1024 * 1024;
+/** No picture or banner needs to be bigger than this to look right. */
+export const IMAGE_LIMIT = 8 * 1024 * 1024;
+
+/** A page's own picture and banner, uploaded on vrc.page. */
+export type PageImage = 'picture' | 'banner';
+
+const COLUMN = { picture: 'pictureImageId', banner: 'bannerImageId' } as const;
 
 const NOTHING_BLOCKED: ReadonlySet<string> = new Set();
 
 export type SettingResult = 'ok' | 'not_found';
-export type BannerResult = { status: 'ok'; url: string } | { status: 'not_found' } | { status: 'not_a_picture' } | { status: 'too_large' };
+export type ImageResult = { status: 'ok'; url: string } | { status: 'not_found' } | { status: 'not_a_picture' } | { status: 'too_large' };
 
 @Injectable()
 export class PageSettingsService {
@@ -90,27 +95,29 @@ export class PageSettingsService {
   }
 
   /**
-   * A banner of the page's own, shown while VRChat has none. Re-encoded like
-   * VRChat's (src/vrchat/images.ts) before anything is written; the picture
-   * it replaces goes as soon as nothing uses it (migration 20261002090300).
+   * A picture or banner of the page's own, shown instead of VRChat's.
+   * Re-encoded like VRChat's (src/vrchat/images.ts) before anything is
+   * written; the one it replaces goes as soon as nothing uses it (migration
+   * 20261003090000).
    */
-  async setBanner(context: RequestContext, accountId: string, pageId: string, bytes: Buffer): Promise<BannerResult> {
-    if (bytes.length > BANNER_LIMIT) return { status: 'too_large' };
-    const kind = sniff(bytes);
-    if (kind !== 'png' && kind !== 'jpeg' && kind !== 'webp' && kind !== 'gif') return { status: 'not_a_picture' };
-    const encoded = await encodeUploadedBanner(bytes);
+  async setImage(context: RequestContext, accountId: string, pageId: string, kind: PageImage, bytes: Buffer): Promise<ImageResult> {
+    if (bytes.length > IMAGE_LIMIT) return { status: 'too_large' };
+    const type = sniff(bytes);
+    if (type !== 'png' && type !== 'jpeg' && type !== 'webp' && type !== 'gif') return { status: 'not_a_picture' };
+    const encoded = await encodeUpload(bytes, kind);
     if (!encoded) return { status: 'not_a_picture' };
 
-    const result = await this.onPage(context, accountId, pageId, 'page.banner_changed', { uploaded: true }, async (trx) => {
+    const result = await this.onPage(context, accountId, pageId, `page.${kind}_changed`, { uploaded: true }, async (trx) => {
       const imageId = await saveUploadedImage(trx, encoded);
-      await trx.updateTable('pages.pages').set({ bannerImageId: imageId }).where('id', '=', pageId).execute();
+      await trx.updateTable('pages.pages').set({ [COLUMN[kind]]: imageId }).where('id', '=', pageId).execute();
     });
     return result === 'ok' ? { status: 'ok', url: imagePath(encoded.sha256)! } : { status: 'not_found' };
   }
 
-  removeBanner(context: RequestContext, accountId: string, pageId: string): Promise<SettingResult> {
-    return this.onPage(context, accountId, pageId, 'page.banner_changed', { uploaded: false }, async (trx) => {
-      await trx.updateTable('pages.pages').set({ bannerImageId: null }).where('id', '=', pageId).execute();
+  /** Back to VRChat's picture or banner. */
+  removeImage(context: RequestContext, accountId: string, pageId: string, kind: PageImage): Promise<SettingResult> {
+    return this.onPage(context, accountId, pageId, `page.${kind}_changed`, { uploaded: false }, async (trx) => {
+      await trx.updateTable('pages.pages').set({ [COLUMN[kind]]: null }).where('id', '=', pageId).execute();
     });
   }
 

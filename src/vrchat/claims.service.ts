@@ -517,7 +517,8 @@ export class ClaimsService {
           bio: user.bio,
           bioLinks: user.bioLinks,
           pronouns: user.pronouns,
-          status: user.status,
+          // Unknown until the first refresh reads it (src/vrchat/api.ts).
+          status: user.status ?? 'offline',
           statusDescription: user.statusDescription,
           isAgeVerified: user.isAgeVerified,
           trustRank: user.trustRank,

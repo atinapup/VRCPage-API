@@ -13,7 +13,7 @@
  *   reused      when VRChat gives an address already stored: no download
  *   kept        when a download fails: the old picture beats none
  *   deleted     by the database, the moment no user, group or page uses it
- *               (migrations 20260929130000, 20261002090300)
+ *               (migrations 20260929130000, 20261002090300, 20261003090000)
  *   served at   /images/<sha256 hex>.webp on the website, which asks
  *               images.controller.ts
  */
@@ -47,15 +47,21 @@ type Picture = { id: string } | Encoded | null | undefined;
 export type Pictures = { icon: Picture; banner: Picture };
 
 /**
- * A banner someone uploaded on vrc.page, made like a VRChat one: upright,
- * fitted inside BANNER_BOX, WebP. The first frame of an animation. Null when
- * sharp can't read it as a picture.
+ * A picture or banner someone uploaded on vrc.page, made like VRChat's:
+ * upright, WebP, the first frame of an animation. A banner is fitted inside
+ * BANNER_BOX; a picture is cut to a square from its middle, ICON_BOX across,
+ * since it is always shown round or rounded. Null when sharp can't read it
+ * as a picture.
  */
-export async function encodeUploadedBanner(original: Buffer): Promise<{ sha256: Buffer; bytes: Buffer; width: number; height: number } | null> {
+export async function encodeUpload(original: Buffer, kind: 'banner' | 'picture'): Promise<{ sha256: Buffer; bytes: Buffer; width: number; height: number } | null> {
   try {
     const { data, info } = await sharp(original, { limitInputPixels: MAX_PIXELS })
       .rotate()
-      .resize({ width: BANNER_BOX, height: BANNER_BOX, fit: 'inside', withoutEnlargement: true })
+      .resize(
+        kind === 'banner'
+          ? { width: BANNER_BOX, height: BANNER_BOX, fit: 'inside', withoutEnlargement: true }
+          : { width: ICON_BOX, height: ICON_BOX, fit: 'cover', withoutEnlargement: false },
+      )
       .webp({ quality: QUALITY })
       .toBuffer({ resolveWithObject: true });
     return { sha256: createHash('sha256').update(data).digest(), bytes: data, width: info.width, height: info.height };

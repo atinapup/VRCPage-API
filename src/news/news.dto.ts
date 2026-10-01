@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class Update {
   id!: string;
   title!: string;
-  /** Plain text with its line breaks. */
+  /** Markdown: emphasis, links, lists, headings and code. The website draws no raw HTML or images from it. */
   body!: string;
   /** /updates/media/<sha256 hex>.<webp|mp4|webm> on the website, or null. */
   @ApiProperty({ type: String, nullable: true })

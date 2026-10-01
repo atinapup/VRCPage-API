@@ -58,7 +58,8 @@ export class AdminService {
       .leftJoin('pages.pages as p', 'p.vrchatUserId', 'u.id')
       .leftJoin('pages.slugs as s', (join) => join.onRef('s.pageId', '=', 'p.id').on('s.role', '=', 'primary'))
       .leftJoin('vrchat.images as icon', 'icon.id', 'u.iconImageId')
-      .select(['a.id', 'a.email', 'a.createdAt', 'u.id as vrchatId', 'u.displayName', 'p.id as pageId', 's.slug', 'icon.sha256 as iconSha256'])
+      .leftJoin('vrchat.images as ownPicture', 'ownPicture.id', 'p.pictureImageId')
+      .select(['a.id', 'a.email', 'a.createdAt', 'u.id as vrchatId', 'u.displayName', 'p.id as pageId', 's.slug', 'icon.sha256 as iconSha256', 'ownPicture.sha256 as ownPictureSha256'])
       .orderBy('a.id', 'desc')
       .limit(PAGE_SIZE + 1);
     if (before) select = select.where('a.id', '<', before);
@@ -88,7 +89,7 @@ export class AdminService {
       roles: roles.filter((role) => role.accountId === row.id).map((role) => role.role),
       vrchatName: row.displayName,
       vrchatId: row.vrchatId,
-      avatarUrl: imagePath(row.iconSha256),
+      avatarUrl: imagePath(row.ownPictureSha256 ?? row.iconSha256),
       pageId: row.pageId,
       slug: row.slug,
       groups: Number(groups.find((group) => group.claimedByVrchatUserId === row.vrchatId)?.count ?? 0),
@@ -260,7 +261,7 @@ export class AdminService {
       visibility: row.visibility!,
       hidden: row.isHidden ?? false,
       vrchatId: row.vrchatId!,
-      iconUrl: imagePath(row.userIcon ?? row.groupIcon),
+      iconUrl: imagePath(row.ownPicture ?? row.userIcon ?? row.groupIcon),
       ownerAccountId: row.ownerAccountId!,
       ownerEmail: row.ownerEmail ?? '',
       createdAt: row.createdAt!.toISOString(),
@@ -275,6 +276,7 @@ export class AdminService {
       .leftJoin('vrchat.groups as g', 'g.id', 'p.vrchatGroupId')
       .leftJoin('vrchat.images as ui', 'ui.id', 'u.iconImageId')
       .leftJoin('vrchat.images as gi', 'gi.id', 'g.iconImageId')
+      .leftJoin('vrchat.images as pi', 'pi.id', 'p.pictureImageId')
       .select([
         'o.pageId',
         'o.kind',
@@ -288,6 +290,7 @@ export class AdminService {
         'o.createdAt',
         'ui.sha256 as userIcon',
         'gi.sha256 as groupIcon',
+        'pi.sha256 as ownPicture',
       ]);
   }
 

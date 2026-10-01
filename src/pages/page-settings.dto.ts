@@ -19,8 +19,8 @@ export class AccentRequest {
   accent!: string | null;
 }
 
-/** A banner uploaded on vrc.page, answered with where it is served. */
-export class OwnBanner {
+/** A picture or banner uploaded on vrc.page, answered with where it is served. */
+export class UploadedImage {
   /** /images/<sha256 hex>.webp on the website. */
   url!: string;
 }

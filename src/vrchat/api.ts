@@ -7,24 +7,27 @@
  * a read that loses a field leaves that field empty rather than throwing away
  * the whole snapshot.
  *
- * The two endpoints vrc.page calls, and nothing else:
+ * The three endpoints vrc.page calls, and nothing else:
  *
  *   GET /profile/{userId}   the public profile
+ *   GET /users/{userId}     status, status line and trust rank, on refresh
  *   GET /groups/{groupId}   a group
  *
  * The profile endpoint, not GET /users/{userId}: VRChat moved the bio onto
  * the profile, and the bio is where a vrcpage- code is pasted. It also
- * carries the represented group and the languages as plain arrays, so one
- * call does what would otherwise take two. The cost is `trustRank`, which
- * only the user endpoint still carries; a second call for a label is not a
- * good use of a budget of 1440 a day, so it stays empty.
+ * carries the represented group and the languages as plain arrays. Since
+ * VRChat's API 1.21 it gives status and the status line only to the
+ * profile's owner (`asSelf`), so a refresh also reads the user endpoint,
+ * which still has both, and `trustRank`. A claim doesn't: it is one call, so
+ * a new page shows its status from its first refresh.
  */
-import type { VRChatGroup, VRChatUser, VRChatUserStatus } from './types.js';
+import type { VRChatGroup, VRChatPresence, VRChatUser, VRChatUserStatus } from './types.js';
 
 export const VRCHAT_BASE_URL = 'https://api.vrchat.cloud/api/1';
 
 export const ENDPOINTS = {
   user: (id: string) => `/profile/${encodeURIComponent(id)}`,
+  userStatus: (id: string) => `/users/${encodeURIComponent(id)}`,
   group: (id: string) => `/groups/${encodeURIComponent(id)}`,
   /** Signs in with Basic auth and sets the `auth` cookie, which then still needs 2FA. */
   signIn: '/auth/user',
@@ -115,7 +118,8 @@ export function readProfile(body: unknown, requestedId: string): VRChatUser | nu
     bio: text(raw.bio, LIMITS.bio),
     bioLinks: list(raw.bioLinks),
     pronouns: optionalText(raw.pronouns, LIMITS.pronouns),
-    status: STATUS[String(raw.status)] ?? 'offline',
+    // Only there for the profile's owner: missing means unknown, not offline.
+    status: STATUS[String(raw.status)] ?? null,
     statusDescription: optionalText(raw.statusDescription, LIMITS.statusDescription),
     isAgeVerified: raw.ageVerificationStatus === '18+',
     trustRank: null,
@@ -123,6 +127,30 @@ export function readProfile(body: unknown, requestedId: string): VRChatUser | nu
     languages: list(raw.languages),
     iconUrl: imageUrl(raw.iconUrl),
     bannerUrl: imageUrl(raw.bannerUrl),
+  };
+}
+
+/** VRChat's trust tags, highest first, with the names VRChat shows for them. */
+const TRUST: ReadonlyArray<readonly [string, string]> = [
+  ['system_trust_veteran', 'Trusted User'],
+  ['system_trust_trusted', 'Known User'],
+  ['system_trust_known', 'User'],
+  ['system_trust_basic', 'New User'],
+];
+
+/**
+ * Status, status line and trust rank, as `GET /users/{userId}` gives them.
+ * A person with tags but none of the trust ones is a Visitor; with no tags
+ * at all, the rank is left unsaid rather than guessed.
+ */
+export function readUserStatus(body: unknown): VRChatPresence | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const raw = body as Record<string, unknown>;
+  const tags = Array.isArray(raw.tags) ? raw.tags : null;
+  return {
+    status: STATUS[String(raw.status)] ?? 'offline',
+    statusDescription: optionalText(raw.statusDescription, LIMITS.statusDescription),
+    trustRank: tags ? (TRUST.find(([tag]) => tags.includes(tag))?.[1] ?? 'Visitor') : null,
   };
 }
 
@@ -203,7 +231,7 @@ if (/api\.[tj]s$/.test(process.argv[1] ?? '')) {
 
   const hidden = readProfile({ id: USER, displayName: 'Mira', ageVerificationStatus: 'hidden', ageVerified: true }, USER);
   check(hidden?.isAgeVerified, false, 'someone who hid their verification is not shown as 18+');
-  check(hidden?.status, 'offline', 'a missing status falls back to offline');
+  check(hidden?.status, null, 'a profile without a status leaves it unknown');
   check(hidden?.bio, '', 'a missing bio is empty, not a failure');
 
   check(readProfile({ id: USER }, USER), null, 'a profile with no name is unreadable');
@@ -225,9 +253,17 @@ if (/api\.[tj]s$/.test(process.argv[1] ?? '')) {
   check(readGroup({ ownerId: USER, privacy: 'private' }, GROUP), null, 'a group with no name is unreadable');
   check(readGroup({ name: 'X', ownerId: USER, privacy: 'private' }, GROUP)?.privacy, 'private', 'a private group reads as private');
 
+  const presence = readUserStatus({ status: 'ask me', statusDescription: ' brb ', tags: ['language_eng', 'system_trust_known', 'system_trust_basic'] });
+  check(presence, { status: 'ask_me', statusDescription: 'brb', trustRank: 'User' }, 'status, line and the highest trust tag come through');
+  check(readUserStatus({ tags: ['language_eng'] })?.trustRank, 'Visitor', 'tags without trust are a Visitor');
+  check(readUserStatus({})?.trustRank, null, 'no tags leaves the rank unsaid');
+  check(readUserStatus({})?.status, 'offline', 'the user endpoint with no status is offline');
+  check(readUserStatus('nope'), null, 'a non-object body is unreadable');
+
   check(ENDPOINTS.user(USER), `/profile/${USER}`, 'the user endpoint is the profile one');
+  check(ENDPOINTS.userStatus(USER), `/users/${USER}`, 'status comes from the user endpoint');
   check(ENDPOINTS.group(GROUP), `/groups/${GROUP}`, 'the group endpoint');
 
-  console.log(failures === 0 ? 'api: 22 checks pass' : `api: ${failures} of 22 checks FAILED`);
+  console.log(failures === 0 ? 'api: 28 checks pass' : `api: ${failures} of 28 checks FAILED`);
   process.exitCode = failures === 0 ? 0 : 1;
 }

@@ -70,9 +70,12 @@ export class UserPage {
   /** The page's own accent colour, #rrggbb, or null for vrc.page's. */
   @ApiProperty({ type: String, nullable: true })
   accent!: string | null;
-  /** A banner uploaded on vrc.page. `bannerUrl` is VRChat's banner when there is one, and this otherwise. */
+  /** A banner uploaded on vrc.page. When there is one, `bannerUrl` is this rather than VRChat's. */
   @ApiProperty({ type: String, nullable: true })
   ownBannerUrl!: string | null;
+  /** A picture uploaded on vrc.page. When there is one, it is the page's picture rather than VRChat's icon. */
+  @ApiProperty({ type: String, nullable: true })
+  ownPictureUrl!: string | null;
 }
 
 export class GroupOwner {
@@ -115,9 +118,12 @@ export class GroupPage {
   /** The page's own accent colour, #rrggbb, or null for vrc.page's. */
   @ApiProperty({ type: String, nullable: true })
   accent!: string | null;
-  /** A banner uploaded on vrc.page. `bannerUrl` is VRChat's banner when there is one, and this otherwise. */
+  /** A banner uploaded on vrc.page. When there is one, `bannerUrl` is this rather than VRChat's. */
   @ApiProperty({ type: String, nullable: true })
   ownBannerUrl!: string | null;
+  /** A picture uploaded on vrc.page. When there is one, it is the page's picture rather than VRChat's icon. */
+  @ApiProperty({ type: String, nullable: true })
+  ownPictureUrl!: string | null;
 }
 
 /**

@@ -16,7 +16,12 @@ export type VRChatUser = {
   bio: string;
   bioLinks: string[];
   pronouns: string | null;
-  status: VRChatUserStatus;
+  /**
+   * Null when the read didn't say. VRChat's profile endpoint only tells a
+   * profile's owner their status, so a read of someone else's has none;
+   * VRChatPresence, from GET /users/{userId}, does.
+   */
+  status: VRChatUserStatus | null;
   statusDescription: string | null;
   /**
    * Only true when VRChat says the person is showing 18+ on their profile.
@@ -24,12 +29,21 @@ export type VRChatUser = {
    * that is their choice and this page is more public than VRChat's.
    */
   isAgeVerified: boolean;
-  /** VRChat stopped sending this with the profile; see `api.ts`. */
+  /** VRChat stopped sending this with the profile; VRChatPresence has it. */
   trustRank: string | null;
   representedGroup: { id: string; name: string } | null;
   languages: string[];
   iconUrl: string | null;
   bannerUrl: string | null;
+};
+
+/** What GET /users/{userId} still says that the profile no longer does. */
+export type VRChatPresence = {
+  status: VRChatUserStatus;
+  /** The line the person wrote under their status. */
+  statusDescription: string | null;
+  /** VRChat's name for the person's trust level, such as "Known User". */
+  trustRank: string | null;
 };
 
 export type VRChatGroup = {

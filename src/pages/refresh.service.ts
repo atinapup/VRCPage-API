@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { Injectable, Logger } from '@nestjs/common';
 import { Audit } from '../audit/audit.js';
 import type { RequestContext } from '../common/request-context.js';
 import { Database } from '../database/database.js';
@@ -26,6 +27,11 @@ import { PagesService } from './pages.service.js';
  * waits: VRChat is read at most once a minute site-wide, so a press that
  * arrives while another read holds the slot is told how long, rather than
  * holding someone's request open for a minute.
+ *
+ * A person's status, status line and trust rank are a second read (VRChat's
+ * profile only gives them to the profile's owner; src/vrchat/api.ts), made
+ * once the slot frees after the first. Nobody waits for it: the page has
+ * them a minute or so after the refresh.
  */
 
 export type RefreshResult =
@@ -51,8 +57,15 @@ const UNIQUE_VIOLATION = '23505';
  */
 const ABANDONED_AFTER_MS = 5 * 60 * 1000;
 
+/** Tries at the status read, each once the slot frees, before leaving it to the next refresh. */
+const STATUS_TRIES = 4;
+/** A wait longer than this is a spent lane or a backoff, not a busy slot: not worth holding a timer for. */
+const STATUS_MAX_WAIT_SECONDS = 300;
+
 @Injectable()
 export class RefreshService {
+  private readonly logger = new Logger(RefreshService.name);
+
   constructor(
     private readonly db: Database,
     private readonly audit: Audit,
@@ -194,10 +207,10 @@ export class RefreshService {
             bio: value.bio,
             bioLinks: value.bioLinks,
             pronouns: value.pronouns,
-            status: value.status,
-            statusDescription: value.statusDescription,
+            // The profile only says these to its owner; readStatus() fills
+            // them in from the user endpoint.
+            ...(value.status ? { status: value.status, statusDescription: value.statusDescription } : {}),
             isAgeVerified: value.isAgeVerified,
-            trustRank: value.trustRank,
             representedGroupId: value.representedGroup?.id ?? null,
             representedGroupName: value.representedGroup?.name ?? null,
             languages: value.languages,
@@ -266,6 +279,7 @@ export class RefreshService {
     });
 
     await finish('succeeded');
+    if (userRead?.ok) this.readStatus(page.vrchatUserId!);
     await this.audit.record(context, {
       action: 'profile.refresh_requested',
       actorType: 'account',
@@ -275,5 +289,30 @@ export class RefreshService {
       metadata: { lane: 'manual' },
     });
     return outcome === 'unclaimed' ? { status: 'unclaimed' } : { status: 'ok', refreshedAt: now.toISOString() };
+  }
+
+  /**
+   * The second read of a person's refresh: status, status line and trust
+   * rank, from the manual lane like the first. Tried as soon as the slot is
+   * free, which is about a minute after the first read took it.
+   *
+   * ponytail: an in-process timer, so a restart in that minute drops it and
+   * the next refresh tries again. A queued job once there is a worker to run
+   * scheduled refreshes.
+   */
+  private readStatus(vrchatUserId: string, tries = STATUS_TRIES, waitSeconds = 0): void {
+    setTimeout(() => {
+      void (async () => {
+        const read = await this.reader.getUserStatus('manual', vrchatUserId);
+        if (!read.ok) {
+          const wait = read.waitSeconds ?? 60;
+          if (read.reason === 'busy' && tries > 1 && wait <= STATUS_MAX_WAIT_SECONDS) this.readStatus(vrchatUserId, tries - 1, wait + 1);
+          return;
+        }
+        await this.db.write({ requestId: randomUUID(), type: 'system', accountId: null }, (trx) =>
+          trx.updateTable('vrchat.users').set(read.value).where('id', '=', vrchatUserId).execute(),
+        );
+      })().catch((error: unknown) => this.logger.warn(`A status read for ${vrchatUserId} failed: ${error instanceof Error ? error.message : String(error)}`));
+    }, waitSeconds * 1000).unref();
   }
 }

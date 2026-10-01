@@ -146,11 +146,13 @@ export class PagesService {
       .leftJoin('vrchat.images as icon', 'icon.id', 'u.iconImageId')
       .leftJoin('vrchat.images as banner', 'banner.id', 'u.bannerImageId')
       .leftJoin('vrchat.images as ownBanner', 'ownBanner.id', 'p.bannerImageId')
+      .leftJoin('vrchat.images as ownPicture', 'ownPicture.id', 'p.pictureImageId')
       .select([
         'p.visibility',
         'p.socialsEnabled',
         'p.accent',
         'ownBanner.sha256 as ownBannerSha256',
+        'ownPicture.sha256 as ownPictureSha256',
         'u.id',
         'u.displayName',
         'u.pronouns',
@@ -187,15 +189,16 @@ export class PagesService {
       bio: row.bio || null,
       links: await this.links(pageId, row.bioLinks),
       languages: row.languages,
-      // VRChat's banner wins; the page's own is for when VRChat has none.
-      bannerUrl: imagePath(row.bannerSha256 ?? row.ownBannerSha256),
-      avatarUrl: imagePath(row.iconSha256),
+      // The page's own picture and banner win: the owner chose them.
+      bannerUrl: imagePath(row.ownBannerSha256 ?? row.bannerSha256),
+      avatarUrl: imagePath(row.ownPictureSha256 ?? row.iconSha256),
       verifiedAt: row.connectedAt.toISOString(),
       lastRefreshedAt: row.fetchedAt.toISOString(),
       visibility: row.visibility,
       socialsEnabled: row.socialsEnabled,
       accent: row.accent,
       ownBannerUrl: imagePath(row.ownBannerSha256),
+      ownPictureUrl: imagePath(row.ownPictureSha256),
     };
   }
 
@@ -208,11 +211,13 @@ export class PagesService {
       .leftJoin('vrchat.images as icon', 'icon.id', 'g.iconImageId')
       .leftJoin('vrchat.images as banner', 'banner.id', 'g.bannerImageId')
       .leftJoin('vrchat.images as ownBanner', 'ownBanner.id', 'p.bannerImageId')
+      .leftJoin('vrchat.images as ownPicture', 'ownPicture.id', 'p.pictureImageId')
       .select([
         'p.visibility',
         'p.socialsEnabled',
         'p.accent',
         'ownBanner.sha256 as ownBannerSha256',
+        'ownPicture.sha256 as ownPictureSha256',
         'g.id',
         'g.name',
         'g.shortCode',
@@ -248,9 +253,9 @@ export class PagesService {
       languages: row.languages,
       memberCount: row.memberCount,
       isVerified: row.isVerified,
-      iconUrl: imagePath(row.iconSha256),
-      // VRChat's banner wins; the page's own is for when VRChat has none.
-      bannerUrl: imagePath(row.bannerSha256 ?? row.ownBannerSha256),
+      iconUrl: imagePath(row.ownPictureSha256 ?? row.iconSha256),
+      // The page's own picture and banner win: the owner chose them.
+      bannerUrl: imagePath(row.ownBannerSha256 ?? row.bannerSha256),
       owner: { displayName: row.ownerName, slug: ownerPublic ? await this.primarySlug(row.ownerPageId!) : null },
       verifiedAt: row.claimedAt.toISOString(),
       lastRefreshedAt: row.fetchedAt.toISOString(),
@@ -258,6 +263,7 @@ export class PagesService {
       socialsEnabled: row.socialsEnabled,
       accent: row.accent,
       ownBannerUrl: imagePath(row.ownBannerSha256),
+      ownPictureUrl: imagePath(row.ownPictureSha256),
     };
   }
 

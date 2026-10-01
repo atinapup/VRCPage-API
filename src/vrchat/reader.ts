@@ -13,7 +13,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { environment } from '../config/app-config.js';
 import { VRChatClient } from './client.js';
 import { fakeReader } from './fake-reader.js';
-import type { Lane, ReadResult, VRChatGroup, VRChatUser } from './types.js';
+import type { Lane, ReadResult, VRChatGroup, VRChatPresence, VRChatUser } from './types.js';
 
 /** What a read answers when there is nothing to read with. */
 const NOTHING_TO_READ_WITH = { ok: false, reason: 'unavailable' } as const;
@@ -32,6 +32,14 @@ export class VRChatReader {
   async getUser(lane: Lane, id: string, jobId?: string): Promise<ReadResult<VRChatUser>> {
     if (this.client.configured) return this.client.getUser(lane, id, jobId);
     if (environment === 'development') return fakeReader.getUser(id);
+    this.warn();
+    return NOTHING_TO_READ_WITH;
+  }
+
+  /** Status, status line and trust rank, which the profile only gives its owner. */
+  async getUserStatus(lane: Lane, id: string, jobId?: string): Promise<ReadResult<VRChatPresence>> {
+    if (this.client.configured) return this.client.getUserStatus(lane, id, jobId);
+    if (environment === 'development') return fakeReader.getUserStatus(id);
     this.warn();
     return NOTHING_TO_READ_WITH;
   }

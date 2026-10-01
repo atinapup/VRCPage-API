@@ -7,8 +7,8 @@ import { optionalFlag, text } from '../common/input.js';
 import { Problem } from '../common/problem.js';
 import { requestContext } from '../common/request-context.js';
 import { uploadedBytes } from '../common/upload.js';
-import { AccentRequest, HiddenLinkRequest, OwnBanner, Preferences, PreferencesPatch, SocialsRequest } from './page-settings.dto.js';
-import { BANNER_LIMIT, PageSettingsService } from './page-settings.service.js';
+import { AccentRequest, HiddenLinkRequest, Preferences, UploadedImage, PreferencesPatch, SocialsRequest } from './page-settings.dto.js';
+import { IMAGE_LIMIT, PageSettingsService, type PageImage } from './page-settings.service.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -62,34 +62,63 @@ export class PageSettingsController {
   }
 
   /**
-   * A banner of the page's own, shown while VRChat has none: the picture's
-   * own bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB.
+   * A banner of the page's own, shown instead of VRChat's: the picture's own
+   * bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB. Fitted inside
+   * 1600 pixels.
    */
   @Put('banner')
   @HttpCode(200)
   @ApiConsumes('image/png', 'image/jpeg', 'image/webp', 'image/gif')
   @ApiBody({ schema: { type: 'string', format: 'binary' } })
-  async banner(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string): Promise<OwnBanner> {
+  banner(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string): Promise<UploadedImage> {
+    return this.setImage(request, viewer, pageId, 'banner');
+  }
+
+  /** Take the page's own banner off, back to VRChat's. */
+  @Delete('banner')
+  @HttpCode(204)
+  removeBanner(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string): Promise<void> {
+    return this.removeImage(request, viewer, pageId, 'banner');
+  }
+
+  /**
+   * A picture of the page's own, shown instead of the VRChat icon: the
+   * picture's own bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB. Cut
+   * to a square from its middle, 512 pixels across.
+   */
+  @Put('picture')
+  @HttpCode(200)
+  @ApiConsumes('image/png', 'image/jpeg', 'image/webp', 'image/gif')
+  @ApiBody({ schema: { type: 'string', format: 'binary' } })
+  picture(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string): Promise<UploadedImage> {
+    return this.setImage(request, viewer, pageId, 'picture');
+  }
+
+  /** Take the page's own picture off, back to VRChat's. */
+  @Delete('picture')
+  @HttpCode(204)
+  removePicture(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string): Promise<void> {
+    return this.removeImage(request, viewer, pageId, 'picture');
+  }
+
+  private async setImage(request: Request, viewer: Viewer, pageId: string, kind: PageImage): Promise<UploadedImage> {
     const bytes = uploadedBytes(request.body);
     if (!bytes) throw new Problem(400, 'not_a_picture', 'Send the picture itself, as PNG, JPEG, WebP or GIF.');
-    const result = UUID.test(pageId) ? await this.settings.setBanner(requestContext(request), viewer.accountId, pageId, bytes) : ({ status: 'not_found' } as const);
+    const result = UUID.test(pageId) ? await this.settings.setImage(requestContext(request), viewer.accountId, pageId, kind, bytes) : ({ status: 'not_found' } as const);
     switch (result.status) {
       case 'ok':
         return { url: result.url };
       case 'not_found':
         throw noPage();
       case 'too_large':
-        throw new Problem(413, 'too_large', `A banner can be up to ${BANNER_LIMIT / 1024 / 1024} MB.`);
+        throw new Problem(413, 'too_large', `A picture can be up to ${IMAGE_LIMIT / 1024 / 1024} MB.`);
       default:
         throw new Problem(400, 'not_a_picture', 'That isn’t a picture vrc.page can use. Try a PNG, JPEG or WebP.');
     }
   }
 
-  /** Take the page's own banner off. */
-  @Delete('banner')
-  @HttpCode(204)
-  async removeBanner(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string): Promise<void> {
-    const result = UUID.test(pageId) ? await this.settings.removeBanner(requestContext(request), viewer.accountId, pageId) : 'not_found';
+  private async removeImage(request: Request, viewer: Viewer, pageId: string, kind: PageImage): Promise<void> {
+    const result = UUID.test(pageId) ? await this.settings.removeImage(requestContext(request), viewer.accountId, pageId, kind) : 'not_found';
     if (result === 'not_found') throw noPage();
   }
 }

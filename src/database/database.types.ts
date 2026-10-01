@@ -69,7 +69,7 @@ export type VrchatCallOutcome = "auth_failed" | "network_error" | "not_found" | 
 
 export type VrchatClaimStatus = "cancelled" | "denied" | "exhausted" | "expired" | "pending" | "succeeded";
 
-export type VrchatEndpoint = "get_group" | "get_user";
+export type VrchatEndpoint = "get_group" | "get_user" | "get_user_status";
 
 export type VrchatFetchError = "not_found" | "rate_limited" | "unavailable";
 
@@ -482,7 +482,7 @@ export interface PagesPages {
    */
   accent: string | null;
   /**
-   * A banner uploaded on vrc.page, shown only while VRChat has none.
+   * A banner uploaded on vrc.page, shown instead of the VRChat banner.
    */
   bannerImageId: string | null;
   createdAt: Generated<Timestamp>;
@@ -500,6 +500,10 @@ export interface PagesPages {
   kind: PagesPageKind;
   lastViewedAt: Timestamp | null;
   nextRefreshAt: Generated<Timestamp>;
+  /**
+   * A picture uploaded on vrc.page, shown instead of the VRChat icon.
+   */
+  pictureImageId: string | null;
   refreshTier: Generated<PagesRefreshTier>;
   /**
    * When the primary name last changed; the rename cooldown counts from here.
@@ -655,7 +659,7 @@ export interface VrchatImages {
   id: Generated<string>;
   sha256: Buffer;
   /**
-   * The address VRChat gave for this picture most recently. A refresh that sees it again downloads nothing. NULL for a banner uploaded on vrc.page.
+   * The address VRChat gave for this picture most recently. A refresh that sees it again downloads nothing. NULL for a picture or banner uploaded on vrc.page.
    */
   sourceUrl: string | null;
   width: number;

@@ -41,10 +41,10 @@ import { sql, type Transaction } from 'kysely';
 import { AppConfig } from '../config/app-config.js';
 import { Database } from '../database/database.js';
 import type { DB, VrchatCallOutcome, VrchatEndpoint, VrchatLane } from '../database/database.types.js';
-import { ENDPOINTS, readGroup, readProfile, VRCHAT_BASE_URL } from './api.js';
+import { ENDPOINTS, readGroup, readProfile, readUserStatus, VRCHAT_BASE_URL } from './api.js';
 import { nextBackoff, untilMidnightUtc } from './budget.js';
 import { totp } from './totp.js';
-import type { Lane, ReadResult, VRChatGroup, VRChatUser } from './types.js';
+import type { Lane, ReadResult, VRChatGroup, VRChatPresence, VRChatUser } from './types.js';
 
 /** How long to wait for VRChat before giving up on one call. */
 const TIMEOUT_MS = 15_000;
@@ -136,6 +136,10 @@ export class VRChatClient implements OnApplicationBootstrap {
     return this.read(lane, 'get_user', id, jobId, (body) => readProfile(body, id));
   }
 
+  getUserStatus(lane: Lane, id: string, jobId?: string): Promise<ReadResult<VRChatPresence>> {
+    return this.read(lane, 'get_user_status', id, jobId, readUserStatus);
+  }
+
   getGroup(lane: Lane, id: string, jobId?: string): Promise<ReadResult<VRChatGroup>> {
     return this.read(lane, 'get_group', id, jobId, (body) => readGroup(body, id));
   }
@@ -193,7 +197,7 @@ export class VRChatClient implements OnApplicationBootstrap {
     const session = slot.session ?? (await this.signIn(settings));
     if (!session) return { ok: false, reason: 'unavailable' };
 
-    const path = endpoint === 'get_user' ? ENDPOINTS.user(id) : ENDPOINTS.group(id);
+    const path = { get_user: ENDPOINTS.user, get_user_status: ENDPOINTS.userStatus, get_group: ENDPOINTS.group }[endpoint](id);
     const answer = await this.call(path, settings.userAgent, { session });
     const durationMs = Date.now() - slot.startedAt.getTime();
 

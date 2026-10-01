@@ -191,9 +191,10 @@ VRChat has no public API, asks that nobody query it more than once a minute, and
 | Read | Endpoint |
 |---|---|
 | A person | `GET /profile/{userId}` |
+| A person's status, on refresh | `GET /users/{userId}` |
 | A group | `GET /groups/{groupId}` |
 
-`GET /profile/{userId}`, not `GET /users/{userId}`: VRChat moved the bio onto the profile, and the bio is where a `vrcpage-` code is pasted. The profile also carries the represented group and the languages as plain arrays, so one call does what would otherwise take two. The cost is `trustRank`, which only the user endpoint still has; a second call per person for one label is not a good use of 1440 calls a day, so that column stays empty and the profile card leaves it out.
+`GET /profile/{userId}`, not `GET /users/{userId}`: VRChat moved the bio onto the profile, and the bio is where a `vrcpage-` code is pasted. The profile also carries the represented group and the languages as plain arrays. Since VRChat's API 1.21 it only tells a profile's owner their `status` and `statusDescription`, so a refresh of a person makes a second read, of `GET /users/{userId}`, for those and `trustRank`. It goes from the same lane once the slot frees, about a minute after the first, and nobody waits for it (`readStatus` in `src/pages/refresh.service.ts`). A claim stays one read, so a new page shows its status from its first refresh; until then it reads as offline with no status line.
 
 18+ comes from `ageVerificationStatus`, not from `ageVerified`: someone who verified and set it to hidden is not shown as 18+ here either.
 
@@ -204,7 +205,7 @@ VRChat has no public API, asks that nobody query it more than once a minute, and
 Nothing reads VRChat on a page view, ever. Reads come from three places only:
 
 - **Issuing a claim code** and **one press of "Check now"**, from the verification lane. Both cost a read, so both wait `claim.code.check_cooldown_seconds` after the account's last one; without that, giving up a claim and starting another in a loop would spend the whole lane for everybody. Asking again for the claim already open reads nothing and hands back the same code, and neither does reopening one: the name is kept on `vrchat.claim_codes.display_name` from the read that issued it.
-- **A manual refresh**, from the manual lane, behind a per-page cooldown and a per-account daily cap.
+- **A manual refresh**, from the manual lane, behind a per-page cooldown and a per-account daily cap. A person's costs two reads: the profile, then their status.
 
 **The session.** The API signs in as a spare account made for vrc.page: `VRCHAT_USERNAME`, `VRCHAT_PASSWORD` and `VRCHAT_TOTP_SECRET`. That's the one VRChat password vrc.page holds, and it belongs to nobody but vrc.page. Signing in is `GET /auth/user` with Basic auth, then `POST /auth/twofactorauth/totp/verify` with the code `src/vrchat/totp.ts` works out from the secret (its test: `node --experimental-strip-types src/vrchat/totp.ts`). The account needs authenticator-app 2FA, because an email code can't be answered without a person.
 
@@ -219,7 +220,7 @@ VRChat icons and banners are copied, never linked: a public page must not make a
 - **Stored as** WebP, fitted inside 512px (icons) or 1600px (banners), named by the sha256 of those bytes. Two people with the same picture share one row.
 - **Kept when a download fails.** The old picture beats none; a picture VRChat no longer has is removed.
 - **Deleted by the database.** A trigger (`internal.drop_unused_images`, migration `20260929130000`) deletes a picture the moment no user or group uses it, which covers a changed picture, a disconnect, an unclaimed group and a deleted account, whose cascade arrives there too. Users and groups hold their pictures with `ON DELETE RESTRICT`, so nothing can delete one still on a page.
-- **Uploaded banners** (`PUT /v1/me/pages/{pageId}/banner`, the picture's own bytes as the body, PNG, JPEG, WebP or GIF up to 8 MB) go through the same encoding, are stored with no `source_url`, and hang off `pages.pages.banner_image_id`. A page shows VRChat's banner when there is one and its own otherwise (`bannerUrl`; `ownBannerUrl` is the uploaded one). The clean-up trigger checks pages' own banners too (migration `20261002090300`).
+- **Uploaded pictures and banners** (`PUT /v1/me/pages/{pageId}/picture` and `/banner`, the picture's own bytes as the body, PNG, JPEG, WebP or GIF up to 8 MB) go through the same encoding, except that a picture is cut to a 512px square from its middle. They are stored with no `source_url` and hang off `pages.pages.picture_image_id` and `banner_image_id`. A page's own wins over VRChat's (`avatarUrl` or `iconUrl`, and `bannerUrl`; `ownPictureUrl` and `ownBannerUrl` are the uploaded ones), and `DELETE` goes back to VRChat's. The clean-up trigger checks pages' own pictures too (migrations `20261002090300`, `20261003090000`).
 - **Served** by `GET /v1/images/{sha256 hex}.webp` with a thirty-day `Cache-Control`, and the website serves that at `/images/<file>`. Pages get the relative address, which `next/image` optimizes like any local picture. Thirty days is the spec's limit for a deleted account's pictures leaving every cache. The route is not rate limited: it is one indexed read, and most requests come from the website's optimizer, all from one address.
 
 ## Appearance and accessibility
@@ -233,6 +234,7 @@ Short notes about changes to vrc.page, in the `news` schema. Admins write them t
 
 - **Pictures** (PNG, JPEG, WebP, GIF) are re-encoded to WebP with sharp, fitted inside 1600px, keeping a GIF's animation. **Clips** (MP4, WebM) are stored as sent. Either is checked by its first bytes, never its claimed type, and is at most 25 MB (`main.ts` reads only these types as raw bytes, and no more than that).
 - **Served** by `GET /v1/updates/media/{sha256 hex}.{webp|mp4|webm}`, immutable, which the website serves at `/updates/media/<file>` with byte ranges for Safari. A picture or clip no update uses any more is deleted with it.
+- **The body is Markdown**, up to 2000 characters: emphasis, links, lists, headings and code. The website draws it without raw HTML or images; the picture or clip goes in the media slot.
 - **Each account sees an update once.** `GET /v1/me/updates` answers the latest ten published and `seenAt`; the website shows the ones published after it, and `POST /v1/me/updates/seen` moves it on. An account that has never looked starts at its own creation, so new accounts aren't greeted with old news.
 
 ## Two database logins, and why readiness checks both
@@ -312,7 +314,8 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `PUT /v1/me/pages/{pageId}/socials` | Turn the page's Socials page on or off. Owners and editors |
 | `PUT /v1/me/pages/{pageId}/hidden-links` | Show or hide one of VRChat's links on the page. Owners and editors |
 | `PUT /v1/me/pages/{pageId}/accent` | The page's accent colour, or null. Owners and editors |
-| `PUT`, `DELETE /v1/me/pages/{pageId}/banner` | A banner of the page's own, for when VRChat has none. Owners and editors |
+| `PUT`, `DELETE /v1/me/pages/{pageId}/picture` | A picture of the page's own, shown instead of VRChat's. Owners and editors |
+| `PUT`, `DELETE /v1/me/pages/{pageId}/banner` | A banner of the page's own, shown instead of VRChat's. Owners and editors |
 | `PUT /v1/me/pages/{pageId}/visibility` | Public, unlisted or private. Owners only; an editor gets `not_allowed` |
 | `PATCH /v1/me/notification-preferences` | Change some of them; the answer is all of them |
 | `DELETE /v1/me/vrchat` | Disconnect VRChat, which takes the page and its groups with it |

@@ -61,7 +61,8 @@ export class EditorsService {
       .selectFrom('vrchat.users as u')
       .leftJoin('pages.pages as p', 'p.vrchatUserId', 'u.id')
       .leftJoin('vrchat.images as icon', 'icon.id', 'u.iconImageId')
-      .select(['u.displayName', 'p.id as pageId', 'icon.sha256 as iconSha256'])
+      .leftJoin('vrchat.images as ownPicture', 'ownPicture.id', 'p.pictureImageId')
+      .select(['u.displayName', 'p.id as pageId', 'icon.sha256 as iconSha256', 'ownPicture.sha256 as ownPictureSha256'])
       .where('u.accountId', '=', accountId)
       .executeTakeFirst();
     if (!row) return { name: null, slug: null, iconUrl: null };
@@ -76,7 +77,7 @@ export class EditorsService {
             .executeTakeFirst()
         )?.slug ?? null)
       : null;
-    return { name: row.displayName, slug, iconUrl: imagePath(row.iconSha256) };
+    return { name: row.displayName, slug, iconUrl: imagePath(row.ownPictureSha256 ?? row.iconSha256) };
   }
 
   /** Seats taken plus invitations still waiting: what the cap counts. */
@@ -183,7 +184,8 @@ export class EditorsService {
       .innerJoin('pages.pages as p', 'p.id', 'i.pageId')
       .innerJoin('vrchat.groups as g', 'g.id', 'p.vrchatGroupId')
       .leftJoin('vrchat.images as icon', 'icon.id', 'g.iconImageId')
-      .select(['i.id', 'i.pageId', 'i.invitedByAccountId', 'i.createdAt', 'g.name', 'g.memberCount', 'icon.sha256 as iconSha256'])
+      .leftJoin('vrchat.images as ownPicture', 'ownPicture.id', 'p.pictureImageId')
+      .select(['i.id', 'i.pageId', 'i.invitedByAccountId', 'i.createdAt', 'g.name', 'g.memberCount', 'icon.sha256 as iconSha256', 'ownPicture.sha256 as ownPictureSha256'])
       .where('i.invitedAccountId', '=', accountId)
       .where('i.status', '=', 'pending')
       .orderBy('i.createdAt')
@@ -201,7 +203,7 @@ export class EditorsService {
         id: row.id,
         groupName: row.name,
         groupSlug: slug?.slug ?? null,
-        groupIconUrl: imagePath(row.iconSha256),
+        groupIconUrl: imagePath(row.ownPictureSha256 ?? row.iconSha256),
         memberCount: row.memberCount,
         invitedBy: (await this.person(this.db, row.invitedByAccountId)).name,
         sentAt: row.createdAt.toISOString(),

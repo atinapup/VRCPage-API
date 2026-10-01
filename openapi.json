@@ -1520,7 +1520,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OwnBanner"
+                  "$ref": "#/components/schemas/UploadedImage"
                 }
               }
             }
@@ -1536,7 +1536,7 @@
             }
           }
         },
-        "summary": "A banner of the page's own, shown while VRChat has none: the picture's\nown bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB.",
+        "summary": "A banner of the page's own, shown instead of VRChat's: the picture's own\nbytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB. Fitted inside\n1600 pixels.",
         "tags": [
           "me"
         ]
@@ -1568,7 +1568,109 @@
             }
           }
         },
-        "summary": "Take the page's own banner off.",
+        "summary": "Take the page's own banner off, back to VRChat's.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/pages/{pageId}/picture": {
+      "put": {
+        "operationId": "pageSettingsPicture",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/gif": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadedImage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "A picture of the page's own, shown instead of the VRChat icon: the\npicture's own bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB. Cut\nto a square from its middle, 512 pixels across.",
+        "tags": [
+          "me"
+        ]
+      },
+      "delete": {
+        "operationId": "pageSettingsRemovePicture",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Take the page's own picture off, back to VRChat's.",
         "tags": [
           "me"
         ]
@@ -3690,7 +3792,12 @@
           "ownBannerUrl": {
             "type": "string",
             "nullable": true,
-            "description": "A banner uploaded on vrc.page. `bannerUrl` is VRChat's banner when there is one, and this otherwise."
+            "description": "A banner uploaded on vrc.page. When there is one, `bannerUrl` is this rather than VRChat's."
+          },
+          "ownPictureUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "A picture uploaded on vrc.page. When there is one, it is the page's picture rather than VRChat's icon."
           },
           "vrchatUserId": {
             "type": "string"
@@ -3739,6 +3846,7 @@
           "visibility",
           "accent",
           "ownBannerUrl",
+          "ownPictureUrl",
           "vrchatUserId",
           "displayName",
           "ageVerified",
@@ -3813,7 +3921,12 @@
           "ownBannerUrl": {
             "type": "string",
             "nullable": true,
-            "description": "A banner uploaded on vrc.page. `bannerUrl` is VRChat's banner when there is one, and this otherwise."
+            "description": "A banner uploaded on vrc.page. When there is one, `bannerUrl` is this rather than VRChat's."
+          },
+          "ownPictureUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "A picture uploaded on vrc.page. When there is one, it is the page's picture rather than VRChat's icon."
           },
           "vrchatGroupId": {
             "type": "string"
@@ -3866,6 +3979,7 @@
           "visibility",
           "accent",
           "ownBannerUrl",
+          "ownPictureUrl",
           "vrchatGroupId",
           "name",
           "shortCode",
@@ -4501,7 +4615,7 @@
           "accent"
         ]
       },
-      "OwnBanner": {
+      "UploadedImage": {
         "type": "object",
         "properties": {
           "url": {
@@ -4677,7 +4791,7 @@
           },
           "body": {
             "type": "string",
-            "description": "Plain text with its line breaks."
+            "description": "Markdown: emphasis, links, lists, headings and code. The website draws no raw HTML or images from it."
           }
         },
         "required": [
@@ -5178,7 +5292,7 @@
           },
           "body": {
             "type": "string",
-            "description": "Plain text with its line breaks."
+            "description": "Markdown: emphasis, links, lists, headings and code. The website draws no raw HTML or images from it."
           },
           "createdAt": {
             "type": "string"

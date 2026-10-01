@@ -199,6 +199,23 @@ BEGIN
 END
 $$;
 
+-- The same for a picture of the page's own.
+INSERT INTO vrchat.images (id, sha256, width, height, byte_size, bytes, source_url) VALUES
+  ('00000000-0000-7000-8000-000000000b05', sha256('uploaded picture'), 1, 1, 1, decode('00', 'hex'), NULL);
+UPDATE pages.pages SET picture_image_id = '00000000-0000-7000-8000-000000000b05'
+ WHERE id = '00000000-0000-7000-8000-0000000000e1';
+SET SESSION AUTHORIZATION vrcpage_api;
+SELECT internal.test_rejects($$DELETE FROM vrchat.images WHERE id = '00000000-0000-7000-8000-000000000b05'$$, 'API deletes a page''s own picture');
+UPDATE pages.pages SET picture_image_id = NULL WHERE id = '00000000-0000-7000-8000-0000000000e1';
+RESET SESSION AUTHORIZATION;
+
+DO $$
+BEGIN
+  ASSERT NOT EXISTS (SELECT 1 FROM vrchat.images WHERE id = '00000000-0000-7000-8000-000000000b05'), 'uploaded picture removed with its page''s use';
+  RAISE NOTICE 'ok    uploaded pictures go when their page stops using them';
+END
+$$;
+
 -------------------------------------------------------------------------------
 -- 3. Deleting a staff account keeps what they did, minus their id.
 -------------------------------------------------------------------------------
