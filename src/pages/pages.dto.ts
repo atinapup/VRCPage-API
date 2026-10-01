@@ -224,8 +224,12 @@ export class OwnGroupPage {
 
 /** What a manual refresh did. */
 export class Refreshed {
-  /** ISO 8601. */
-  refreshedAt!: string;
+  /**
+   * ISO 8601, or null when VRChat's once-a-minute turn was taken: the refresh
+   * is queued and runs by itself as soon as the turn frees.
+   */
+  @ApiProperty({ type: String, nullable: true })
+  refreshedAt!: string | null;
 }
 
 /** Which emails the account gets. No row in the database means these defaults. */

@@ -49,6 +49,9 @@ export class ClaimCheck {
   /** The page that now exists, when the code matched. */
   @ApiProperty({ type: String, required: false })
   pageId?: string;
+  /** Whose account, or which group, matched: as VRChat names it now. */
+  @ApiProperty({ type: String, required: false })
+  displayName?: string;
   /** Where the claim stands, while it is still open. */
   @ApiProperty({ type: PendingClaim, required: false })
   claim?: PendingClaim;

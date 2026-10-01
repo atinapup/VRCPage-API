@@ -114,7 +114,7 @@ export class ClaimsController {
     const kind = this.kindOf(rawKind);
     const result = await this.claims.check(requestContext(request), viewer.accountId, kind);
     if (result.status === 'no_claim') throw new NotFoundException('There is no claim waiting.');
-    if (result.status === 'matched') return { status: 'matched', pageId: result.pageId };
+    if (result.status === 'matched') return { status: 'matched', pageId: result.pageId, displayName: result.displayName };
     if (result.status === 'expired' || result.status === 'exhausted') return { status: result.status };
     // A refusal here is not an error: the code did match, and the screen has
     // a step to go back to.

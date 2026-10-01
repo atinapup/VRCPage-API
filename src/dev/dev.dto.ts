@@ -43,8 +43,11 @@ export class FakeGroupView {
 export class FakeWorldView {
   users!: FakeUserView[];
   groups!: FakeGroupView[];
-  @ApiProperty({ enum: ['none', 'rate_limited', 'unavailable'], description: 'How reads answer: normally, or as VRChat does when it pushes back.' })
-  reads!: 'none' | 'rate_limited' | 'unavailable';
+  @ApiProperty({
+    enum: ['none', 'rate_limited', 'unavailable', 'busy'],
+    description: 'How reads answer: normally, as VRChat does when it pushes back, or as if another read had the turn.',
+  })
+  reads!: 'none' | 'rate_limited' | 'unavailable' | 'busy';
 }
 
 /** New text for a test bio or description: where a code gets "pasted into VRChat". */
@@ -54,6 +57,6 @@ export class FakeTextRequest {
 
 /** How the stand-in reader should answer. */
 export class FakeReadsRequest {
-  @ApiProperty({ enum: ['none', 'rate_limited', 'unavailable'] })
-  reads!: 'none' | 'rate_limited' | 'unavailable';
+  @ApiProperty({ enum: ['none', 'rate_limited', 'unavailable', 'busy'] })
+  reads!: 'none' | 'rate_limited' | 'unavailable' | 'busy';
 }

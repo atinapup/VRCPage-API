@@ -182,9 +182,12 @@ export const FAKE_GROUPS: FakeGroup[] = [
 type World = {
   users: Map<string, FakeUser>;
   groups: Map<string, FakeGroup>;
-  /** How reads answer: normally, or as VRChat does when it pushes back. */
-  failure: 'none' | 'rate_limited' | 'unavailable';
+  /** How reads answer: normally, as VRChat does when it pushes back, or as if another read had the turn. */
+  failure: 'none' | 'rate_limited' | 'unavailable' | 'busy';
 };
+
+/** What a `busy` read says to wait: short, so a queued refresh is seen trying again. */
+const FAKE_BUSY_SECONDS = 10;
 
 const world: World = {
   users: new Map(Object.values(FAKE_USERS).map((user) => [user.id, user])),
@@ -198,6 +201,7 @@ function key(id: string): string {
 }
 
 function answer<T>(value: T | undefined): ReadResult<T> {
+  if (world.failure === 'busy') return { ok: false, reason: 'busy', waitSeconds: FAKE_BUSY_SECONDS };
   if (world.failure !== 'none') return { ok: false, reason: world.failure };
   // A copy, so nothing downstream can edit the "VRChat" record by accident.
   return value ? { ok: true, value: structuredClone(value) } : { ok: false, reason: 'not_found' };

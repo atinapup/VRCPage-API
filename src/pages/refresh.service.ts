@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { Audit } from '../audit/audit.js';
 import type { RequestContext } from '../common/request-context.js';
 import { Database } from '../database/database.js';
@@ -23,10 +23,11 @@ import { PagesService } from './pages.service.js';
  * refresh that finds either has changed acts on it: a group handed to someone
  * else is unclaimed, and one made private is made private here too.
  *
- * The read itself goes through VRChatReader, from the manual lane. It never
- * waits: VRChat is read at most once a minute site-wide, so a press that
- * arrives while another read holds the slot is told how long, rather than
- * holding someone's request open for a minute.
+ * The read itself goes through VRChatReader, from the manual lane. VRChat is
+ * read at most once a minute site-wide, so a press that arrives while another
+ * read holds the turn is queued: its job goes back to `queued` with run_after
+ * set to when the turn frees, and drain() runs it then. Nobody's request is
+ * held open for that minute; the answer says it is queued.
  *
  * A person's status, status line and trust rank are a second read (VRChat's
  * profile only gives them to the profile's owner; src/vrchat/api.ts), made
@@ -36,6 +37,8 @@ import { PagesService } from './pages.service.js';
 
 export type RefreshResult =
   | { status: 'ok'; refreshedAt: string }
+  /** VRChat's turn was taken, so the job waits in the queue and drain() runs it once the turn frees. */
+  | { status: 'queued' }
   | { status: 'not_found' }
   | { status: 'not_allowed' }
   | { status: 'cooldown'; wait: number }
@@ -44,7 +47,7 @@ export type RefreshResult =
   | { status: 'gone' }
   /** The group has another owner now, so its page went. */
   | { status: 'unclaimed' }
-  /** Nothing was asked of VRChat: the slot is taken, or the lane is spent for today. */
+  /** Nothing was asked of VRChat and nothing was queued: the lane is spent for today, or reads are paused. */
   | { status: 'busy'; wait: number }
   | { status: 'unavailable' };
 
@@ -59,12 +62,21 @@ const ABANDONED_AFTER_MS = 5 * 60 * 1000;
 
 /** Tries at the status read, each once the slot frees, before leaving it to the next refresh. */
 const STATUS_TRIES = 4;
-/** A wait longer than this is a spent lane or a backoff, not a busy slot: not worth holding a timer for. */
-const STATUS_MAX_WAIT_SECONDS = 300;
+/** A wait longer than this is a spent lane or a backoff, not a busy slot: not worth queueing or holding a timer for. */
+const MAX_SLOT_WAIT_SECONDS = 300;
+
+/**
+ * How often the queue is checked for a refresh whose turn has come. Well
+ * under the minute between reads, so a queued one goes out within seconds of
+ * the turn freeing rather than up to a minute after.
+ */
+const DRAIN_INTERVAL_MS = 10_000;
 
 @Injectable()
-export class RefreshService {
+export class RefreshService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(RefreshService.name);
+  private timer?: NodeJS.Timeout;
+  private draining = false;
 
   constructor(
     private readonly db: Database,
@@ -74,13 +86,21 @@ export class RefreshService {
     private readonly images: VRChatImages,
   ) {}
 
+  onApplicationBootstrap(): void {
+    this.timer = setInterval(() => void this.drain(), DRAIN_INTERVAL_MS);
+    this.timer.unref();
+  }
+
+  onApplicationShutdown(): void {
+    if (this.timer) clearInterval(this.timer);
+  }
+
   private async settings() {
-    const [cooldownSeconds, dailyCap, ownerOnly] = await Promise.all([
-      this.db.setting<number>('refresh.manual.cooldown_seconds'),
+    const [dailyCap, ownerOnly] = await Promise.all([
       this.db.setting<number>('refresh.manual.daily_cap_per_account'),
       this.db.setting<boolean>('refresh.manual.owner_only'),
     ]);
-    return { cooldownSeconds, dailyCap, ownerOnly };
+    return { dailyCap, ownerOnly };
   }
 
   async refresh(context: RequestContext, accountId: string, pageId: string): Promise<RefreshResult> {
@@ -109,12 +129,7 @@ export class RefreshService {
       if (Number(today.count) >= settings.dailyCap) return { status: 'daily_limit', cap: settings.dailyCap };
     }
 
-    const page = await this.db
-      .selectFrom('pages.pages as p')
-      .leftJoin('vrchat.groups as g', 'g.id', 'p.vrchatGroupId')
-      .select(['p.kind', 'p.vrchatUserId', 'p.vrchatGroupId', 'g.claimedByVrchatUserId'])
-      .where('p.id', '=', pageId)
-      .executeTakeFirstOrThrow();
+    const { kind } = await this.db.selectFrom('pages.pages').select('kind').where('id', '=', pageId).executeTakeFirstOrThrow();
 
     // A job still running after this long was abandoned: the process stopped
     // or threw mid-refresh. Nothing else will ever close it, and while it is
@@ -133,7 +148,7 @@ export class RefreshService {
       const job = await this.db
         .insertInto('vrchat.jobs')
         .values({
-          kind: page.kind === 'user' ? 'user_refresh' : 'group_refresh',
+          kind: kind === 'user' ? 'user_refresh' : 'group_refresh',
           lane: 'manual',
           pageId,
           requestedBy: accountId,
@@ -145,14 +160,77 @@ export class RefreshService {
         .executeTakeFirstOrThrow();
       jobId = job.id;
     } catch (error) {
-      // Another press is being read right now. An admin's wait is for that read, not the page's cooldown.
-      if ((error as { code?: string }).code === UNIQUE_VIOLATION) return { status: 'cooldown', wait: role === 'admin' ? 60 : settings.cooldownSeconds };
+      // Another press is queued or being read right now, and refreshes the page for this one too.
+      if ((error as { code?: string }).code === UNIQUE_VIOLATION) return { status: 'queued' };
       throw error;
     }
 
-    // Whatever goes wrong from here, the job is closed, or it would hold the
-    // page's one open slot until it was found abandoned.
+    return this.run(context, accountId, pageId, jobId);
+  }
+
+  /**
+   * Run the next queued refresh whose turn has come, every DRAIN_INTERVAL_MS.
+   * One per pass: there is one turn a minute, so a second would only be
+   * queued again. SKIP LOCKED means two API processes never take the same
+   * job, and the turn itself (vrchat.client_state) still decides who reads.
+   *
+   * ponytail: a fresh press can take the turn ahead of a queued job, which
+   * then waits for the next one. Queue every press if that starts to bite.
+   */
+  private async drain(): Promise<void> {
+    if (this.draining) return;
+    this.draining = true;
     try {
+      const job = await this.db
+        .updateTable('vrchat.jobs')
+        .set((eb) => ({ status: 'running', startedAt: new Date(), attempts: eb('attempts', '+', 1) }))
+        .where(
+          'id',
+          '=',
+          this.db
+            .selectFrom('vrchat.jobs')
+            .select('id')
+            .where('status', '=', 'queued')
+            .where('kind', 'in', ['user_refresh', 'group_refresh'])
+            .where('runAfter', '<=', new Date())
+            .orderBy('priority')
+            .orderBy('runAfter')
+            .orderBy('id')
+            .limit(1)
+            .forUpdate()
+            .skipLocked(),
+        )
+        .returning(['id', 'pageId', 'requestedBy'])
+        .executeTakeFirst();
+      if (!job) return;
+
+      // The account that pressed it was deleted, and with it the reason to read.
+      if (!job.requestedBy) {
+        await this.db.updateTable('vrchat.jobs').set({ status: 'cancelled', finishedAt: new Date() }).where('id', '=', job.id).execute();
+        return;
+      }
+      const context = { requestId: randomUUID(), ip: null, userAgent: null, headers: new Headers() };
+      await this.run(context, job.requestedBy, job.pageId!, job.id);
+    } catch (error) {
+      this.logger.warn(`A queued refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      this.draining = false;
+    }
+  }
+
+  /**
+   * Read the page for a running job and store what came back. Whatever goes
+   * wrong, the job is closed, or it would hold the page's one open slot until
+   * it was found abandoned.
+   */
+  private async run(context: RequestContext, accountId: string, pageId: string, jobId: string): Promise<RefreshResult> {
+    try {
+      const page = await this.db
+        .selectFrom('pages.pages as p')
+        .leftJoin('vrchat.groups as g', 'g.id', 'p.vrchatGroupId')
+        .select(['p.kind', 'p.vrchatUserId', 'p.vrchatGroupId', 'g.claimedByVrchatUserId'])
+        .where('p.id', '=', pageId)
+        .executeTakeFirstOrThrow();
       return await this.readAndStore(context, accountId, pageId, page, jobId);
     } catch (error) {
       await this.db
@@ -181,10 +259,21 @@ export class RefreshService {
     const groupRead = page.kind === 'group' ? await this.reader.getGroup('manual', page.vrchatGroupId!, jobId) : null;
     const read = (userRead ?? groupRead)!;
     if (!read.ok) {
+      // Nothing was asked, so nothing was learned and nothing was spent. A
+      // turn that frees soon is waited for in the queue. A longer wait is a
+      // spent lane or a backoff: the job is closed, and the press can be made
+      // again later.
+      const wait = read.waitSeconds ?? 60;
+      if (read.reason === 'busy' && wait <= MAX_SLOT_WAIT_SECONDS) {
+        await this.db
+          .updateTable('vrchat.jobs')
+          .set({ status: 'queued', startedAt: null, runAfter: new Date(Date.now() + wait * 1000) })
+          .where('id', '=', jobId)
+          .execute();
+        return { status: 'queued' };
+      }
       await finish('failed', read.reason);
-      // Nothing was asked, so nothing was learned and nothing was spent: the
-      // job is closed and the press can be made again once the slot frees.
-      if (read.reason === 'busy') return { status: 'busy', wait: read.waitSeconds ?? 60 };
+      if (read.reason === 'busy') return { status: 'busy', wait };
       if (read.reason !== 'not_found') return { status: 'unavailable' };
       await this.db.write(actor, async (trx) => {
         const set = { lastFetchError: 'not_found' as const, lastFetchErrorAt: new Date() };
@@ -306,7 +395,7 @@ export class RefreshService {
         const read = await this.reader.getUserStatus('manual', vrchatUserId);
         if (!read.ok) {
           const wait = read.waitSeconds ?? 60;
-          if (read.reason === 'busy' && tries > 1 && wait <= STATUS_MAX_WAIT_SECONDS) this.readStatus(vrchatUserId, tries - 1, wait + 1);
+          if (read.reason === 'busy' && tries > 1 && wait <= MAX_SLOT_WAIT_SECONDS) this.readStatus(vrchatUserId, tries - 1, wait + 1);
           return;
         }
         await this.db.write({ requestId: randomUUID(), type: 'system', accountId: null }, (trx) =>

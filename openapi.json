@@ -1009,7 +1009,7 @@
             }
           }
         },
-        "summary": "Read the page again from VRChat now, rather than waiting for its turn.\nOwners only, one manual refresh per page per refresh.manual.cooldown_seconds,\nand refresh.manual.daily_cap_per_account a day.",
+        "summary": "Read the page again from VRChat now, rather than waiting for its turn.\nOwners only, one manual refresh per page per refresh.manual.cooldown_seconds,\nand refresh.manual.daily_cap_per_account a day. VRChat is read once a\nminute for everyone, so a press that finds the turn taken is queued and\nruns by itself once it frees: `refreshedAt` is null then.",
         "tags": [
           "me"
         ]
@@ -3228,7 +3228,7 @@
             }
           }
         },
-        "summary": "Make reads fail the way VRChat does when it pushes back.",
+        "summary": "Make reads fail the way VRChat does when it pushes back, or answer as if another read had the turn.",
         "tags": [
           "dev"
         ]
@@ -4357,7 +4357,8 @@
         "properties": {
           "refreshedAt": {
             "type": "string",
-            "description": "ISO 8601."
+            "nullable": true,
+            "description": "ISO 8601, or null when VRChat's once-a-minute turn was taken: the refresh\nis queued and runs by itself as soon as the turn frees."
           }
         },
         "required": [
@@ -4748,6 +4749,10 @@
           "pageId": {
             "type": "string",
             "description": "The page that now exists, when the code matched."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Whose account, or which group, matched: as VRChat names it now."
           },
           "claim": {
             "description": "Where the claim stands, while it is still open.",
@@ -5428,10 +5433,11 @@
             "enum": [
               "none",
               "rate_limited",
-              "unavailable"
+              "unavailable",
+              "busy"
             ],
             "type": "string",
-            "description": "How reads answer: normally, or as VRChat does when it pushes back."
+            "description": "How reads answer: normally, as VRChat does when it pushes back, or as if another read had the turn."
           },
           "users": {
             "type": "array",
@@ -5470,7 +5476,8 @@
             "enum": [
               "none",
               "rate_limited",
-              "unavailable"
+              "unavailable",
+              "busy"
             ],
             "type": "string"
           }

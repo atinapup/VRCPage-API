@@ -184,7 +184,9 @@ export class MeController {
   /**
    * Read the page again from VRChat now, rather than waiting for its turn.
    * Owners only, one manual refresh per page per refresh.manual.cooldown_seconds,
-   * and refresh.manual.daily_cap_per_account a day.
+   * and refresh.manual.daily_cap_per_account a day. VRChat is read once a
+   * minute for everyone, so a press that finds the turn taken is queued and
+   * runs by itself once it frees: `refreshedAt` is null then.
    */
   @Post('pages/:pageId/refresh')
   @HttpCode(200)
@@ -196,6 +198,8 @@ export class MeController {
     switch (result.status) {
       case 'ok':
         return { refreshedAt: result.refreshedAt };
+      case 'queued':
+        return { refreshedAt: null };
       case 'not_found':
         throw new NotFoundException('There is no page of yours with that id.');
       case 'not_allowed':
@@ -203,9 +207,9 @@ export class MeController {
       case 'cooldown':
         throw new Problem(429, 'refresh_cooldown', 'This page was refreshed a moment ago.', result.wait);
       case 'busy':
-        // Not this page's fault: vrc.page reads VRChat once a minute for
-        // everyone, and another read has the turn.
-        throw new Problem(429, 'refresh_cooldown', 'vrc.page reads VRChat once a minute, and another read has the turn.', result.wait);
+        // Not this page's fault: today's manual reads are spent, or VRChat
+        // reads are paused, so there is no turn soon enough to queue for.
+        throw new Problem(429, 'refresh_cooldown', 'vrc.page can’t read VRChat for a while. Try again later.', result.wait);
       case 'daily_limit':
         throw new Problem(429, 'refresh_daily_limit', `You can refresh pages ${result.cap} times a day.`);
       case 'gone':

@@ -130,11 +130,11 @@ export class DevController {
     if (!fakeWorld.setDescription(id, text(body, 'text', 8000))) throw new NotFoundException('No test group with that id.');
   }
 
-  /** Make reads fail the way VRChat does when it pushes back. */
+  /** Make reads fail the way VRChat does when it pushes back, or answer as if another read had the turn. */
   @Put('vrchat/reads')
   @HttpCode(204)
   setReads(@Body() body: FakeReadsRequest): void {
-    fakeWorld.setFailure(choice(body, 'reads', ['none', 'rate_limited', 'unavailable'] as const));
+    fakeWorld.setFailure(choice(body, 'reads', ['none', 'rate_limited', 'unavailable', 'busy'] as const));
   }
 
   /** The last few codes printed to the API's terminal, newest first. */
