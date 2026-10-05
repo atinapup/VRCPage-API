@@ -23,7 +23,7 @@ export type SaveFailure =
   | { status: 'not_found' }
   | { status: 'disabled' }
   | { status: 'too_many'; max: number }
-  | { status: 'bad_link'; at: number; reason: 'empty' | 'not_url' | 'not_https' | 'blocked' | 'stream_key' | 'duplicate' | 'label_too_long' };
+  | { status: 'bad_link'; at: number; reason: 'empty' | 'not_url' | 'not_https' | 'blocked' | 'duplicate' | 'label_too_long' };
 
 export type SaveResult = { status: 'ok'; links: OwnLink[] } | SaveFailure;
 

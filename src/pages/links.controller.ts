@@ -74,8 +74,6 @@ export class LinksController {
         return new Problem(400, 'label_too_long', 'That label is too long.').at(result.at);
       case 'not_https':
         return new Problem(400, 'link_invalid', 'Links have to start with https.').at(result.at);
-      case 'stream_key':
-        return new Problem(400, 'link_stream_key', 'That is your VRCDN stream key. Paste your viewer link instead.').at(result.at);
       default:
         return new Problem(400, 'link_invalid', 'That is not an address a browser could open.').at(result.at);
     }

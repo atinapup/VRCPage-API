@@ -8,7 +8,6 @@ import { MailService } from '../mail/mail.service.js';
 import type { DB } from '../database/database.types.js';
 import { imagePath } from '../vrchat/images.js';
 import { checkLink, linkIdentity } from './links.js';
-import { liveStreams } from './streams.js';
 import type {
   Dashboard,
   NameAvailability,
@@ -308,12 +307,12 @@ export class PagesService {
       const user = await this.userPage(found.id);
       if (!user) return null;
       user.links = user.links.filter((link) => !link.hidden);
-      return { pageId: found.id, kind: 'user', slug: primary, alias, redirect, user, live: await liveStreams(user.links) };
+      return { pageId: found.id, kind: 'user', slug: primary, alias, redirect, user };
     }
     const group = await this.groupPage(found.id);
     if (!group) return null;
     group.links = group.links.filter((link) => !link.hidden);
-    return { pageId: found.id, kind: 'group', slug: primary, alias, redirect, group, live: await liveStreams(group.links) };
+    return { pageId: found.id, kind: 'group', slug: primary, alias, redirect, group };
   }
 
   /**
@@ -337,7 +336,7 @@ export class PagesService {
     const user = await this.userPage(found.id);
     if (!user) return null;
     user.links = user.links.filter((link) => !link.hidden);
-    return { pageId: found.id, kind: 'user', slug: found.slug, alias: false, redirect: false, user, live: [] };
+    return { pageId: found.id, kind: 'user', slug: found.slug, alias: false, redirect: false, user };
   }
 
   /* The signed-in account's own pages ------------------------------------- */

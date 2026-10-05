@@ -38,7 +38,6 @@ export const PROBLEM_CODES = [
   'link_invalid',
   'link_blocked',
   'link_duplicate',
-  'link_stream_key',
   'label_too_long',
   'not_a_picture',
   'too_large',

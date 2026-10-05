@@ -15,16 +15,6 @@ export class PageLink {
   hidden!: boolean;
 }
 
-/** One of a page's streams that is live right now. */
-export class LiveStream {
-  @ApiProperty({ enum: ['vrcdn'] })
-  platform!: 'vrcdn';
-  /** The stream's name on VRCDN. */
-  name!: string;
-  /** Where anybody can watch it: https://vrcdn.live/preview/<name>. */
-  url!: string;
-}
-
 export class RepresentedGroup {
   id!: string;
   name!: string;
@@ -145,12 +135,6 @@ export class PublicPage {
   user?: UserPage;
   @ApiProperty({ type: GroupPage, required: false })
   group?: GroupPage;
-  /**
-   * Its streams that are live right now, VRCDN's for now. Asked of each
-   * stream at most every 30 seconds. Always empty from /v1/showcase.
-   */
-  @ApiProperty({ type: [LiveStream] })
-  live!: LiveStream[];
 }
 
 /** One page in the dashboard's navigation. */

@@ -4144,30 +4144,6 @@
           "socialsEnabled"
         ]
       },
-      "LiveStream": {
-        "type": "object",
-        "properties": {
-          "platform": {
-            "type": "string",
-            "enum": [
-              "vrcdn"
-            ]
-          },
-          "name": {
-            "type": "string",
-            "description": "The stream's name on VRCDN."
-          },
-          "url": {
-            "type": "string",
-            "description": "Where anybody can watch it: https://vrcdn.live/preview/<name>."
-          }
-        },
-        "required": [
-          "platform",
-          "name",
-          "url"
-        ]
-      },
       "PublicPage": {
         "type": "object",
         "properties": {
@@ -4183,13 +4159,6 @@
           },
           "group": {
             "$ref": "#/components/schemas/GroupPage"
-          },
-          "live": {
-            "description": "Its streams that are live right now, VRCDN's for now. Asked of each\nstream at most every 30 seconds. Always empty from /v1/showcase.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LiveStream"
-            }
           },
           "pageId": {
             "type": "string",
@@ -4210,7 +4179,6 @@
         },
         "required": [
           "kind",
-          "live",
           "pageId",
           "slug",
           "alias",
