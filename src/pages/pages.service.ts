@@ -139,6 +139,24 @@ export class PagesService {
     ];
   }
 
+  /**
+   * The links a page's visitors see, in order, and whether visitors can open
+   * the page at all. Null for a page that doesn't exist. Lighter than
+   * userPage()/groupPage() for page stats, which only need the links.
+   */
+  async visibleLinks(pageId: string): Promise<{ open: boolean; links: PageLink[] } | null> {
+    const row = await this.db
+      .selectFrom('pages.pages as p')
+      .leftJoin('vrchat.users as u', 'u.id', 'p.vrchatUserId')
+      .leftJoin('vrchat.groups as g', 'g.id', 'p.vrchatGroupId')
+      .select(['p.visibility', 'p.hiddenAt', 'u.bioLinks', 'g.links'])
+      .where('p.id', '=', pageId)
+      .executeTakeFirst();
+    if (!row) return null;
+    const links = await this.links(pageId, row.bioLinks ?? row.links ?? []);
+    return { open: row.visibility !== 'private' && row.hiddenAt === null, links: links.filter((link) => !link.hidden) };
+  }
+
   async userPage(pageId: string): Promise<UserPage | null> {
     const row = await this.db
       .selectFrom('pages.pages as p')

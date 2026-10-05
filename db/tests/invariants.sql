@@ -250,6 +250,12 @@ SELECT internal.test_rejects($$DELETE FROM moderation.bans$$, 'API deletes a ban
 SELECT internal.test_rejects($$DELETE FROM moderation.reports$$, 'API deletes a report');
 SELECT internal.test_rejects($$DELETE FROM pages.slugs WHERE slug_key = 'atian'$$, 'API deletes a name');
 SELECT internal.test_rejects($$UPDATE moderation.bans SET reason = 'rewritten'$$, 'API rewrites a ban reason');
+INSERT INTO pages.visit_events (page_id, visit_id, kind, seconds)
+VALUES ('00000000-0000-7000-8000-0000000000e1', '00000000-0000-7000-8000-0000000000e2', 'leave', 42);
+SELECT internal.test_rejects($$UPDATE pages.visit_events SET seconds = 1800$$, 'API rewrites a visit');
+SELECT internal.test_rejects($$DELETE FROM pages.visit_events$$, 'API deletes a visit');
+SELECT internal.test_rejects($$INSERT INTO pages.visit_events (page_id, visit_id, kind, seconds)
+                               VALUES ('00000000-0000-7000-8000-0000000000e1', '00000000-0000-7000-8000-0000000000e2', 'click', 5)$$, 'click without a link');
 SELECT internal.test_rejects($$UPDATE config.settings SET min_value = '1' WHERE key = 'log.retention.audit_days'$$, 'API lowers a retention floor');
 SELECT internal.test_rejects($$SELECT internal.purge_expired()$$, 'API runs the purge');
 SELECT set_config('internal.purge', 'on', true);
@@ -434,6 +440,7 @@ BEGIN
   ASSERT to_regclass('audit.events_' || to_char(utc_now + interval '1 month', 'YYYYMM')) IS NOT NULL, 'next month of audit.events';
   ASSERT to_regclass('audit.row_changes_' || to_char(utc_now + interval '1 month', 'YYYYMM')) IS NOT NULL, 'next month of row_changes';
   ASSERT to_regclass('pages.views_' || to_char(utc_now + interval '30 days', 'YYYYMMDD')) IS NOT NULL, 'next 30 days of views';
+  ASSERT to_regclass('pages.visit_events_' || to_char(utc_now + interval '30 days', 'YYYYMMDD')) IS NOT NULL, 'next 30 days of visit events';
   ASSERT EXISTS (SELECT 1 FROM audit.events WHERE action = 'maintenance.completed'), 'maintenance logged itself';
   RAISE NOTICE 'ok    maintenance runs and partitions are ahead';
 END

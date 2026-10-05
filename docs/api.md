@@ -144,6 +144,21 @@ A page shows VRChat's links first, then the ones added on vrc.page. `PUT /v1/me/
 
 `GET /v1/pages/{slug}` also answers `live`: the page's VRCDN streams that are live right now (`src/pages/streams.ts`). Each is asked about at most every 30 seconds, by requesting its MPEG-TS address with a 2-second timeout, so a slow VRCDN costs a page two seconds at most and never fails it. Twitch and YouTube need developer keys and are not checked yet.
 
+## Page stats
+
+The website reports what visitors do on a public page with `POST /v1/pages/{pageId}/events`, one call per event, each carrying the `visitId` the browser made for that load of the page:
+- **`view`** when the page opens. It goes in `pages.views` with `visitor_hash` (`src/common/visitor.ts`: an HMAC of the address, as `addressKey()` gives it, under a key derived from `BETTER_AUTH_SECRET` and the UTC month), the visitor's country as Cloudflare named it, and the referring site's host. Never the address itself.
+- **`click`** when one of its links is opened. The address must be one of the page's visible links by link identity, and the page's own copy of it is what is stored, so nobody can write other links into a page's stats.
+- **`leave`** when the visitor moves on, with the seconds the page was visible, capped at 30 minutes.
+
+**It always answers 204.** A page that is private, taken down or missing, or a link the page doesn't have, is dropped without saying so, so the route can't be asked what exists. It has its own rate limit, `beacon`, 120 a minute per address. The website only calls it for visitors who don't run the page, and never for bots.
+
+Reading them back:
+- **`GET /v1/me/pages/{pageId}/stats?days=7|30|90`** is for anyone who runs the page: owners, editors, and admins. It has views and unique visitors by UTC day, link clicks, how many visits opened a link, the median and average stay and a breakdown of stays, and every link on the page with its clicks (zeros included, then removed links that were opened).
+- **`GET /v1/admin/stats?days=&pageId=`** is for admins only. It has the same numbers, plus the visitors' countries, referring sites, views by hour of day, and the last 50 visits. Without `pageId` it covers the whole site: account and page counts, the most viewed pages, and the sites links led to. Where and when visitors came are on this route only.
+
+Every range ends today (UTC) and reads the raw logs, which are kept 90 days. Unique visitors are counted per calendar month, because the hash key changes monthly, so a range crossing a month can count one visitor twice.
+
 ## Admin
 
 An account with the `admin` role in `auth.account_roles` may run every page and every account. There are two halves to that:
@@ -305,6 +320,7 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `DELETE /v1/auth/account` | Delete the account and everything it owns |
 | `GET /v1/pages/{slug}` | The public page at a name; one identical 404 for private, hidden, held and unknown |
 | `GET /v1/showcase` | One of the pages picked for the home page, at random; 404 when none is |
+| `POST /v1/pages/{pageId}/events` | A visitor opened the page, opened one of its links, or left. Always 204 |
 | `GET /v1/me/dashboard` | The dashboard's frame: the account's page, groups, claims left, invites |
 | `GET /v1/me/page` | The account's own page, whatever its visibility |
 | `GET /v1/me/groups/{pageId}` | A group it owns or edits; any other id is a 404 |
@@ -331,6 +347,7 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `GET /v1/me/groups/{pageId}/editors` | Seats taken, then invitations waiting. Owners only |
 | `POST /v1/me/groups/{pageId}/editors` | Ask the person at a vrc.page name to help run it |
 | `DELETE /v1/me/groups/{pageId}/editors/{id}` | Take a row off that list: revoked, removed, or left |
+| `GET /v1/me/pages/{pageId}/stats` | Views, visitors, time on page and link clicks over 7, 30 or 90 days. Owners and editors |
 | `GET /v1/me/pages/{pageId}/links` | The page's own links, in order, with the limits that apply |
 | `PUT /v1/me/pages/{pageId}/links` | Replace them with this ordered list. Owners and editors |
 | `POST /v1/me/pages/{pageId}/refresh` | Read it again from VRChat now. Owners only, with a wait between and a daily limit; admins skip both |
@@ -343,6 +360,7 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `DELETE /v1/admin/accounts/{accountId}/sessions` | Admins: sign it out everywhere |
 | `DELETE /v1/admin/accounts/{accountId}/vrchat` | Admins: disconnect its VRChat account |
 | `DELETE /v1/admin/accounts/{accountId}` | Admins: delete it and everything it owns |
+| `GET /v1/admin/stats` | Admins: every page stat, plus countries, referrers, hours and recent visits; the whole site, or one page with `pageId` |
 | `GET /v1/admin/pages` | Admins: every page, whatever its visibility, 50 at a time |
 | `GET /v1/admin/pages/{pageId}` | Admins: one page with its owner, aliases, takedown and whether it is a home page example |
 | `PUT`, `DELETE /v1/admin/pages/{pageId}/hidden` | Admins: take it down with a reason, or put it back |

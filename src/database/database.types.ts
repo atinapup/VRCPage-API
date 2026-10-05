@@ -561,9 +561,28 @@ export interface PagesViews {
   pageId: string;
   referrerHost: string | null;
   /**
+   * Random id the browser made for this visit; ties the view to its rows in pages.visit_events.
+   */
+  visitId: string | null;
+  /**
    * HMAC of the IP with a monthly key derived from a secret the API holds. Counts uniques; cannot be reversed here.
    */
   visitorHash: Buffer;
+}
+
+export interface PagesVisitEvents {
+  kind: string;
+  /**
+   * For a click: the page's own copy of the link opened, never what the browser sent.
+   */
+  linkUrl: string | null;
+  occurredAt: Generated<Timestamp>;
+  pageId: string;
+  /**
+   * For a leave: seconds the page was visible, capped at 30 minutes.
+   */
+  seconds: number | null;
+  visitId: string;
 }
 
 export interface VrchatApiCalls {
@@ -756,6 +775,7 @@ export interface DB {
   "pages.slugs": PagesSlugs;
   "pages.viewDaily": PagesViewDaily;
   "pages.views": PagesViews;
+  "pages.visitEvents": PagesVisitEvents;
   "vrchat.apiCalls": VrchatApiCalls;
   "vrchat.budgetToday": VrchatBudgetToday;
   "vrchat.claimCodes": VrchatClaimCodes;

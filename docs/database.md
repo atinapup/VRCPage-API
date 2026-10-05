@@ -52,7 +52,7 @@ Write a new migration and apply it to development with `db:migrate`. Undo it wit
 | `auth` | `accounts`, `sessions`, `identities`, `verifications` and `rate_limits` (the five Better Auth tables), plus `account_roles` and `notification_preferences` |
 | `config` | `settings` (every tunable limit), `legal_documents`, `legal_acceptances` |
 | `vrchat` | `users` (connected VRChat users and their snapshot), `groups` (claimed groups), `images` (their icons and banners as WebP bytes, deleted with their last use), `claim_codes`, `jobs` (the request queue), `api_calls`, `client_state`; view `budget_today` |
-| `pages` | `pages`, `slugs` (names, aliases and held names), `links`, `editor_invites`, `editors`, `custom_domains`, `views`, `view_daily`; view `page_overview` |
+| `pages` | `pages`, `slugs` (names, aliases and held names), `links`, `editor_invites`, `editors`, `custom_domains`, `views`, `visit_events`, `view_daily`; view `page_overview` |
 | `moderation` | `bans`, `ban_evidence`, `reports`; view `active_bans` |
 | `mail` | `messages` (log and outbox), `events` (Resend webhooks), `suppressions` |
 | `audit` | `events` (who did what), `row_changes` (exact history of data) |
@@ -124,7 +124,7 @@ erDiagram
 
 | Tier | Tables | How it is enforced |
 |---|---|---|
-| Logs | `audit.events`, `audit.row_changes`, `vrchat.api_calls`, `mail.events`, `pages.views` | `internal.forbid_change()` refuses UPDATE, DELETE and TRUNCATE, even for the owner. Rows leave only through `internal.purge_expired()` at the end of their retention |
+| Logs | `audit.events`, `audit.row_changes`, `vrchat.api_calls`, `mail.events`, `pages.views`, `pages.visit_events` | `internal.forbid_change()` refuses UPDATE, DELETE and TRUNCATE, even for the owner. Rows leave only through `internal.purge_expired()` at the end of their retention |
 | Insert-only records | `config.legal_documents`, `config.legal_acceptances`, `moderation.ban_evidence` | The API may only INSERT and SELECT. A parent's cascade can remove them, and history records that |
 | Locked columns | `moderation.bans`, `moderation.reports`, `config.settings`, `pages.slugs` | Column-level grants. A ban's reason and subject, a report's reporter and snapshot, and a setting's bounds can never change. The API has no DELETE on any of these |
 
@@ -240,7 +240,7 @@ Do not set `usePlural`. Better Auth checks the schema at start-up, and that chec
 ## Retention and maintenance
 
 `internal.run_maintenance()` runs nightly. It returns a summary and logs `maintenance.completed`.
-- **Partitions:** creates upcoming ones (3 months for audit, 60 days for views), and rolls up daily view totals.
+- **Partitions:** creates upcoming ones (3 months for audit, 60 days for views and visit events), and rolls up daily view totals.
 - **Removes, by age:**
 
   | What | Kept for (days) |
@@ -248,7 +248,7 @@ Do not set `usePlural`. Better Auth checks the schema at start-up, and that chec
   | Standard audit events | 90 |
   | Security audit events | 365 |
   | Row history | 365 |
-  | Raw views | 90 |
+  | Raw views and visit events | 90 |
   | VRChat calls | 90 |
   | Mail | 90 |
   | Finished jobs | 30 |
@@ -260,6 +260,12 @@ Do not set `usePlural`. Better Auth checks the schema at start-up, and that chec
 The partitioned tables have no DEFAULT partition. A missing partition makes inserts fail loudly instead of hiding rows where retention can't reach them. The API's health check should confirm the next 7 days exist.
 
 `audit.row_changes` keeps a deleted account's last row (including its email) for 365 days as security evidence. The privacy policy has to say so.
+
+## Page stats
+
+A visit is one load of a public page, named by a random `visit_id` the browser makes. Its view is a row in `pages.views`; what the visitor did next is in `pages.visit_events` under the same id: a `click` (with `link_url`, the page's own copy of the link) or a `leave` (with `seconds` visible, at most 1800). Both are logs, partitioned by day, kept for `log.retention.profile_view_days`, with no foreign keys, so they outlive a deleted page until retention drops them.
+
+`visitor_hash` is an HMAC of the visitor's address under a monthly key the API derives from its own secret, so unique visitors can be counted without the database holding an address, and a new month makes everyone new. Stats are read straight from these raw tables; nothing rolls clicks or stays up yet.
 
 ## Adding a table
 

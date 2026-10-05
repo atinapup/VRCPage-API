@@ -8,13 +8,15 @@ import { PageSettingsService } from './page-settings.service.js';
 import { MeController, PagesController, ShowcaseController } from './pages.controller.js';
 import { PagesService } from './pages.service.js';
 import { RefreshService } from './refresh.service.js';
+import { StatsController, VisitsController } from './stats.controller.js';
+import { StatsService } from './stats.service.js';
 import { VRChatModule } from '../vrchat/vrchat.module.js';
 
 @Module({
   // Refreshing a page is a read of VRChat, so it goes through the same door.
   imports: [VRChatModule],
-  controllers: [PagesController, ShowcaseController, MeController, EditorsController, LinksController, PageSettingsController, PreferencesController],
-  providers: [PagesService, EditorsService, LinksService, RefreshService, PageSettingsService],
-  exports: [PagesService],
+  controllers: [PagesController, ShowcaseController, MeController, EditorsController, LinksController, PageSettingsController, PreferencesController, VisitsController, StatsController],
+  providers: [PagesService, EditorsService, LinksService, RefreshService, PageSettingsService, StatsService],
+  exports: [PagesService, StatsService],
 })
 export class PagesModule {}

@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import type { Viewer } from '../auth/auth.service.js';
 import { CurrentViewer, SessionGuard } from '../auth/session.guard.js';
@@ -7,6 +7,9 @@ import { optionalFlag, text } from '../common/input.js';
 import { Problem } from '../common/problem.js';
 import { requestContext } from '../common/request-context.js';
 import type { AccountRole } from '../pages/pages.service.js';
+import { statsDays } from '../pages/stats.controller.js';
+import { AdminStats } from '../pages/stats.dto.js';
+import { StatsService } from '../pages/stats.service.js';
 import {
   AdminAccount,
   AdminAccountList,
@@ -55,7 +58,10 @@ function role(value: string): AccountRole {
 @Controller('admin')
 @UseGuards(SessionGuard, AdminGuard)
 export class AdminController {
-  constructor(private readonly admin: AdminService) {}
+  constructor(
+    private readonly admin: AdminService,
+    private readonly stats: StatsService,
+  ) {}
 
   /* Accounts --------------------------------------------------------------- */
 
@@ -129,6 +135,22 @@ export class AdminController {
   }
 
   /* Pages ------------------------------------------------------------------ */
+
+  /**
+   * Everything about visits over the last 7, 30 or 90 days: the whole site,
+   * or one page with `pageId`. Where visitors came from and when are here
+   * only, never on an owner's own stats.
+   */
+  @Get('stats')
+  @ApiQuery({ name: 'days', required: false, enum: ['7', '30', '90'] })
+  @ApiQuery({ name: 'pageId', required: false })
+  async siteStats(@Query('days') days?: string, @Query('pageId') pageId?: string): Promise<AdminStats> {
+    const range = statsDays(days);
+    if (pageId !== undefined && !UUID.test(pageId)) throw noPage();
+    const stats = await this.stats.adminStats(range, pageId ?? null);
+    if (!stats) throw noPage();
+    return stats;
+  }
 
   /** Pages, newest first, 50 at a time. `q` matches a name or alias, the VRChat name or the owner's email. */
   @Get('pages')

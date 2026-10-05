@@ -1748,6 +1748,104 @@
         ]
       }
     },
+    "/v1/pages/{pageId}/events": {
+      "post": {
+        "operationId": "visitsRecord",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitEvent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Record one thing a visitor did: opened the page, opened one of its links,\nor moved on. Always 204: a page nobody can open, or a link it doesn't\nhave, is dropped without saying so.",
+        "tags": [
+          "pages"
+        ]
+      }
+    },
+    "/v1/me/pages/{pageId}/stats": {
+      "get": {
+        "operationId": "statsGet",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "7",
+                "30",
+                "90"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageStats"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Views, unique visitors, time on page and link clicks, by UTC day, over the last 7, 30 or 90 days.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
     "/v1/me/vrchat/claims/{kind}": {
       "get": {
         "operationId": "claimsPending",
@@ -2397,6 +2495,59 @@
         ]
       }
     },
+    "/v1/admin/stats": {
+      "get": {
+        "operationId": "adminSiteStats",
+        "parameters": [
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "7",
+                "30",
+                "90"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminStats"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/v1/admin/pages": {
       "get": {
         "operationId": "adminPages",
@@ -2440,6 +2591,7 @@
             }
           }
         },
+        "summary": "Pages, newest first, 50 at a time. `q` matches a name or alias, the VRChat name or the owner's email.",
         "tags": [
           "admin"
         ]
@@ -4664,6 +4816,199 @@
           }
         }
       },
+      "VisitEvent": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "view",
+              "click",
+              "leave"
+            ],
+            "type": "string",
+            "description": "view: the page opened. click: a link on it was opened. leave: the visitor moved on."
+          },
+          "referrer": {
+            "type": "string",
+            "description": "For a view: the host of the page that linked here, if the browser said."
+          },
+          "country": {
+            "type": "string",
+            "description": "For a view: the visitor's country, as two letters, from Cloudflare."
+          },
+          "url": {
+            "type": "string",
+            "description": "For a click: the link's address, exactly as the page shows it."
+          },
+          "seconds": {
+            "type": "integer",
+            "description": "For a leave: seconds the page was visible."
+          },
+          "visitId": {
+            "type": "string",
+            "description": "A random id the browser made for this visit, the same on every event of it."
+          }
+        },
+        "required": [
+          "kind",
+          "visitId"
+        ]
+      },
+      "StatsDay": {
+        "type": "object",
+        "properties": {
+          "views": {
+            "type": "integer"
+          },
+          "visitors": {
+            "type": "integer"
+          },
+          "clicks": {
+            "type": "integer"
+          },
+          "day": {
+            "type": "string",
+            "description": "A UTC day, as YYYY-MM-DD."
+          }
+        },
+        "required": [
+          "views",
+          "visitors",
+          "clicks",
+          "day"
+        ]
+      },
+      "StatsDuration": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "enum": [
+              "<10s",
+              "10-30s",
+              "30s-1m",
+              "1-3m",
+              "3m+"
+            ],
+            "type": "string"
+          },
+          "visits": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bucket",
+          "visits"
+        ]
+      },
+      "StatsLink": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "description": "The label the page gives it; null shows the address."
+          },
+          "clicks": {
+            "type": "integer"
+          },
+          "visits": {
+            "type": "integer",
+            "description": "Visits that opened it at least once."
+          },
+          "url": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "False for a link no longer on the page that was opened in the range."
+          }
+        },
+        "required": [
+          "label",
+          "clicks",
+          "visits",
+          "url",
+          "current"
+        ]
+      },
+      "StatsTotals": {
+        "type": "object",
+        "properties": {
+          "views": {
+            "type": "integer"
+          },
+          "visitors": {
+            "type": "integer",
+            "description": "Distinct visitors, by address, within each calendar month."
+          },
+          "clicks": {
+            "type": "integer"
+          },
+          "visitsWithClick": {
+            "type": "integer",
+            "description": "Page views after which at least one link was opened. A /<name>/<platform> redirect is a click without one."
+          },
+          "medianSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Half of the visits that said how long they stayed were shorter than this."
+          },
+          "averageSeconds": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "views",
+          "visitors",
+          "clicks",
+          "visitsWithClick",
+          "medianSeconds",
+          "averageSeconds"
+        ]
+      },
+      "PageStats": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "enum": [
+              7,
+              30,
+              90
+            ],
+            "type": "number"
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsDay"
+            }
+          },
+          "durations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsDuration"
+            }
+          },
+          "links": {
+            "description": "Every link on the page, in its order, then removed ones that were opened. Empty for the whole site.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsLink"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/StatsTotals"
+          }
+        },
+        "required": [
+          "days",
+          "daily",
+          "durations",
+          "links",
+          "totals"
+        ]
+      },
       "PendingClaim": {
         "type": "object",
         "properties": {
@@ -5125,6 +5470,302 @@
             "description": "Up to 200 characters. Empty clears it."
           }
         }
+      },
+      "StatsCountry": {
+        "type": "object",
+        "properties": {
+          "views": {
+            "type": "integer"
+          },
+          "country": {
+            "type": "string",
+            "description": "Two letters, as Cloudflare names it."
+          }
+        },
+        "required": [
+          "views",
+          "country"
+        ]
+      },
+      "StatsReferrer": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "nullable": true,
+            "description": "The site that linked here; null when the browser didn't say."
+          },
+          "views": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "host",
+          "views"
+        ]
+      },
+      "StatsHour": {
+        "type": "object",
+        "properties": {
+          "hour": {
+            "type": "integer",
+            "description": "Hour of the day, UTC, 0 to 23."
+          },
+          "views": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hour",
+          "views"
+        ]
+      },
+      "StatsVisit": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string",
+            "nullable": true
+          },
+          "referrer": {
+            "type": "string",
+            "nullable": true
+          },
+          "seconds": {
+            "type": "integer",
+            "nullable": true,
+            "description": "How long the page was visible; null when the browser never said."
+          },
+          "at": {
+            "type": "string"
+          },
+          "pageId": {
+            "type": "string"
+          },
+          "links": {
+            "description": "The links opened during the visit.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "country",
+          "referrer",
+          "seconds",
+          "at",
+          "pageId",
+          "links"
+        ]
+      },
+      "StatsSite": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "integer"
+          },
+          "newAccounts": {
+            "type": "integer",
+            "description": "Accounts made in the range."
+          },
+          "pages": {
+            "type": "integer"
+          },
+          "userPages": {
+            "type": "integer"
+          },
+          "groupPages": {
+            "type": "integer"
+          },
+          "publicPages": {
+            "type": "integer",
+            "description": "Public and not taken down."
+          },
+          "activePages": {
+            "type": "integer",
+            "description": "Pages viewed at least once in the range."
+          }
+        },
+        "required": [
+          "accounts",
+          "newAccounts",
+          "pages",
+          "userPages",
+          "groupPages",
+          "publicPages",
+          "activePages"
+        ]
+      },
+      "StatsPage": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          },
+          "views": {
+            "type": "integer"
+          },
+          "visitors": {
+            "type": "integer"
+          },
+          "clicks": {
+            "type": "integer"
+          },
+          "medianSeconds": {
+            "type": "number",
+            "nullable": true
+          },
+          "pageId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "kind",
+          "views",
+          "visitors",
+          "clicks",
+          "medianSeconds",
+          "pageId"
+        ]
+      },
+      "StatsHost": {
+        "type": "object",
+        "properties": {
+          "clicks": {
+            "type": "integer"
+          },
+          "host": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clicks",
+          "host"
+        ]
+      },
+      "AdminStats": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "enum": [
+              7,
+              30,
+              90
+            ],
+            "type": "number"
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsDay"
+            }
+          },
+          "durations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsDuration"
+            }
+          },
+          "links": {
+            "description": "Every link on the page, in its order, then removed ones that were opened. Empty for the whole site.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsLink"
+            }
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsCountry"
+            }
+          },
+          "referrers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsReferrer"
+            }
+          },
+          "hours": {
+            "description": "All 24 hours, UTC.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsHour"
+            }
+          },
+          "recent": {
+            "description": "The last 50 visits.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsVisit"
+            }
+          },
+          "site": {
+            "nullable": true,
+            "description": "The whole site's numbers; null for one page.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StatsSite"
+              }
+            ]
+          },
+          "topPages": {
+            "description": "The most viewed pages; empty for one page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsPage"
+            }
+          },
+          "hosts": {
+            "description": "The sites links led to most; empty for one page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsHost"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/StatsTotals"
+          }
+        },
+        "required": [
+          "days",
+          "daily",
+          "durations",
+          "links",
+          "countries",
+          "referrers",
+          "hours",
+          "recent",
+          "site",
+          "topPages",
+          "hosts",
+          "totals"
+        ]
       },
       "AdminPageList": {
         "type": "object",
