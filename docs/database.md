@@ -265,7 +265,7 @@ The partitioned tables have no DEFAULT partition. A missing partition makes inse
 
 A visit is one load of a public page, named by a random `visit_id` the browser makes. Its view is a row in `pages.views`; what the visitor did next is in `pages.visit_events` under the same id: a `click` (with `link_url`, the page's own copy of the link) or a `leave` (with `seconds` visible, at most 1800). Both are logs, partitioned by day, kept for `log.retention.profile_view_days`, with no foreign keys, so they outlive a deleted page until retention drops them.
 
-`visitor_hash` is an HMAC of the visitor's address under a monthly key the API derives from its own secret, so unique visitors can be counted without the database holding an address, and a new month makes everyone new. Stats are read straight from these raw tables; nothing rolls clicks or stays up yet.
+Both carry `visitor_hash` (on `visit_events` since it was added; older rows have none), so one visitor's views, clicks and leaves can be followed together. `visitor_hash` is an HMAC of the visitor's address under a monthly key the API derives from its own secret, so unique visitors can be counted without the database holding an address, and a new month makes everyone new. Stats are read straight from these raw tables; nothing rolls clicks or stays up yet.
 
 ## Adding a table
 
