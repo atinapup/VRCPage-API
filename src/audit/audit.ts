@@ -14,11 +14,16 @@ export type AuditEvent = {
   targetId?: string;
   /** Never a secret, an email address or a page name: ids say who and what. */
   metadata?: Record<string, string | number | boolean>;
-  /** Sign-in and account events: kept longer, and with the full IP (spec section 14). */
+  /** Sign-in and account events: kept longer (log.retention.security_days). */
   security?: boolean;
 };
 
-/** Writes audit.events, the record of who did what, including failures and refusals. */
+/**
+ * Writes audit.events, the record of who did what, including failures and
+ * refusals. Every event keeps the address and browser of whoever acted, for
+ * the admin logs; anonymous page views never come here (pages.views keeps a
+ * visitor hash instead).
+ */
 @Injectable()
 export class Audit {
   private readonly logger = new Logger(Audit.name);
@@ -35,8 +40,8 @@ export class Audit {
       requestId: context.requestId,
       actorType: event.actorType,
       actorAccountId: event.actorAccountId ?? null,
-      ip: event.security ? context.ip : null,
-      userAgent: event.security ? context.userAgent : null,
+      ip: context.ip,
+      userAgent: context.userAgent,
       action: event.action,
       result: event.result ?? 'success',
       targetType: event.targetType ?? null,

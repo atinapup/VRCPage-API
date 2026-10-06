@@ -2182,6 +2182,159 @@
         ]
       }
     },
+    "/v1/admin/logs": {
+      "get": {
+        "operationId": "adminLogList",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Start of the range, ISO 8601. Defaults to 24 hours before `to`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "End of the range, ISO 8601, exclusive. Defaults to now.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auth",
+                "account",
+                "page",
+                "group",
+                "vrchat",
+                "admin",
+                "visit",
+                "system"
+              ]
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "description": "One action exactly, such as login.success.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "result",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "success",
+                "failure",
+                "denied",
+                "rate_limited"
+              ]
+            }
+          },
+          {
+            "name": "user",
+            "required": false,
+            "in": "query",
+            "description": "An account id, or part of an email address.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page id or a vrc.page name.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ip",
+            "required": false,
+            "in": "query",
+            "description": "An address, or a range such as 203.0.113.0/24.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "requestId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "field",
+            "required": false,
+            "in": "query",
+            "description": "A metadata key. Alone, the key must be there; with `value`, it must have that value.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "value",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "description": "The `at` of the last entry already shown, from `next`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Everything that happened, newest first, 50 at a time: every action in\naudit.events (sign-ins, account and page changes, staff actions,\nrefusals and errors) and every page visit, in one timeline. Filtered by\ntime range (24 hours unless said), type, action, result, user, page,\naddress, request or any metadata field.",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/v1/admin/accounts": {
       "get": {
         "operationId": "adminAccounts",
@@ -5147,6 +5300,193 @@
         "required": [
           "updates",
           "seenAt"
+        ]
+      },
+      "LogActor": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "The account's email, while the account exists."
+          },
+          "accountId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "accountId"
+        ]
+      },
+      "LogTarget": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "description": "A name to show for it, when it is an account or a page that still exists."
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "description": "The page's name on vrc.page, when the target is a page."
+          },
+          "type": {
+            "type": "string",
+            "description": "What kind of thing: account, page, slug, link, session, vrchat_user, update..."
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "slug",
+          "type",
+          "id"
+        ]
+      },
+      "LogEntry": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "auth",
+              "account",
+              "page",
+              "group",
+              "vrchat",
+              "admin",
+              "visit",
+              "system"
+            ],
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "type": "string",
+            "description": "info: it worked. warning: refused or rate limited. error: it failed."
+          },
+          "result": {
+            "enum": [
+              "success",
+              "failure",
+              "denied",
+              "rate_limited"
+            ],
+            "type": "string"
+          },
+          "actorType": {
+            "enum": [
+              "account",
+              "anonymous",
+              "staff",
+              "system"
+            ],
+            "type": "string"
+          },
+          "actor": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LogActor"
+              }
+            ]
+          },
+          "ip": {
+            "type": "string",
+            "nullable": true,
+            "description": "Never set for a page's visits, which keep a visitor hash in metadata instead."
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string",
+            "nullable": true
+          },
+          "target": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LogTarget"
+              }
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The API request it happened in; the same id is in that process's own log."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Detail particular to the action. Never a secret."
+          },
+          "id": {
+            "type": "string",
+            "description": "Unique within the log; not an id anything else uses."
+          },
+          "at": {
+            "type": "string",
+            "description": "When, to the microsecond, as ISO 8601 in UTC. Also the cursor for `before`."
+          },
+          "action": {
+            "type": "string",
+            "description": "`<area>.<what happened>`, such as login.success or visit.link_clicked."
+          }
+        },
+        "required": [
+          "type",
+          "level",
+          "result",
+          "actorType",
+          "actor",
+          "ip",
+          "userAgent",
+          "country",
+          "target",
+          "requestId",
+          "metadata",
+          "id",
+          "at",
+          "action"
+        ]
+      },
+      "LogPage": {
+        "type": "object",
+        "properties": {
+          "logs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LogEntry"
+            }
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pass as `before` for the next, older, screen; null at the end."
+          },
+          "actions": {
+            "description": "Every action logged in the range, for a filter's choices.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "logs",
+          "next",
+          "actions"
         ]
       },
       "AdminAccountRow": {

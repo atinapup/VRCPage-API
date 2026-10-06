@@ -22,6 +22,8 @@ import {
 } from './admin.dto.js';
 import { AdminGuard } from './admin.guard.js';
 import { AdminService } from './admin.service.js';
+import { LogPage, LogQuery } from './logs.dto.js';
+import { logFilter, LogsService } from './logs.service.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NAME = /^[A-Za-z0-9_-]{1,64}$/;
@@ -61,7 +63,20 @@ export class AdminController {
   constructor(
     private readonly admin: AdminService,
     private readonly stats: StatsService,
+    private readonly logs: LogsService,
   ) {}
+
+  /**
+   * Everything that happened, newest first, 50 at a time: every action in
+   * audit.events (sign-ins, account and page changes, staff actions,
+   * refusals and errors) and every page visit, in one timeline. Filtered by
+   * time range (24 hours unless said), type, action, result, user, page,
+   * address, request or any metadata field.
+   */
+  @Get('logs')
+  logList(@Query() query: LogQuery): Promise<LogPage> {
+    return this.logs.list(logFilter(query));
+  }
 
   /* Accounts --------------------------------------------------------------- */
 

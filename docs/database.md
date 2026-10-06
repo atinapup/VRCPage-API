@@ -152,7 +152,7 @@ SELECT set_config('app.request_id', $1, true),
 ```
 
 Also:
-- Write the matching `audit.events` row (action names like `slug.claimed`, `admin.user_banned`).
+- Write the matching `audit.events` row (action names like `slug.claimed`, `admin.user_banned`: `<area>.<what happened>`, which the table's check enforces). Every row keeps the IP and browser of whoever acted, for the admin logs; `security` decides only how long it is kept.
 - Call `internal.ensure_partitions()` at start-up.
 - Have the scheduler call `internal.run_maintenance()` nightly as `vrcpage_maintenance`.
 

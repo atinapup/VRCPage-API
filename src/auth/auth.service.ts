@@ -407,7 +407,7 @@ export class AuthService implements OnModuleInit, OnApplicationShutdown {
   async signOut(context: RequestContext, viewer: Viewer | null): Promise<CookieHeaders> {
     const { headers } = await this.auth.api.signOut({ headers: context.headers, returnHeaders: true });
     if (viewer) {
-      await this.log(context, { action: 'logout', actorType: 'account', actorAccountId: viewer.accountId, targetType: 'session', targetId: viewer.sessionId, security: true });
+      await this.log(context, { action: 'logout.success', actorType: 'account', actorAccountId: viewer.accountId, targetType: 'session', targetId: viewer.sessionId, security: true });
     }
     return headers;
   }

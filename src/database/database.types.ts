@@ -91,7 +91,7 @@ export interface AuditEvents {
   actorType: AuditActorType;
   id: Generated<string>;
   /**
-   * Full IP, written for security events only (spec section 14).
+   * IP of whoever acted, on every event, for the admin logs. Security events are kept longer (retention).
    */
   ip: string | null;
   ipCountry: string | null;
@@ -109,6 +109,9 @@ export interface AuditEvents {
   sessionId: string | null;
   targetId: string | null;
   targetType: string | null;
+  /**
+   * Browser of whoever acted, on every event.
+   */
   userAgent: string | null;
 }
 

@@ -4,6 +4,7 @@ import { SwaggerModule } from '@nestjs/swagger';
 import { toNodeHandler } from 'better-auth/node';
 import type { Express, NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module.js';
+import { Audit } from './audit/audit.js';
 import { AuthService } from './auth/auth.service.js';
 import { buildOpenApiDocument, configureRoutes } from './app.setup.js';
 import { ProblemDetailsFilter } from './common/problem-details.filter.js';
@@ -53,7 +54,7 @@ express.get('/api/auth/*splat', (request, response) => {
   authHandler ??= toNodeHandler(auth.auth);
   return authHandler(request, response);
 });
-app.useGlobalFilters(new ProblemDetailsFilter());
+app.useGlobalFilters(new ProblemDetailsFilter(app.get(Audit)));
 app.enableShutdownHooks();
 configureRoutes(app);
 

@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { BadRequestException } from '@nestjs/common';
 
 /*
@@ -53,6 +54,15 @@ export function choice<T extends string>(body: unknown, field: string, allowed: 
   return value as T;
 }
 
+/** An address, or one with a prefix length: 203.0.113.7, 203.0.113.0/24, 2001:db8::/32. */
+export function isAddressOrRange(value: string): boolean {
+  const [address, bits, extra] = value.split('/');
+  const version = isIP(address);
+  if (!version || extra !== undefined) return false;
+  if (bits === undefined) return true;
+  return /^\d{1,3}$/.test(bits) && Number(bits) <= (version === 4 ? 32 : 128);
+}
+
 /** The check: node --experimental-strip-types src/common/input.ts */
 if (/input\.[tj]s$/.test(process.argv[1] ?? '')) {
   const cases: Array<[string, boolean]> = [
@@ -68,8 +78,23 @@ if (/input\.[tj]s$/.test(process.argv[1] ?? '')) {
     ['https://evil.example', false],
     ['dashboard', false],
   ];
-  const failed = cases.filter(([path, want]) => isLocalPath(path) !== want);
-  for (const [path] of failed) console.error(`  FAILED: ${path}`);
-  console.log(failed.length === 0 ? `input: ${cases.length} checks pass` : `input: ${failed.length} of ${cases.length} checks FAILED`);
+  const addresses: Array<[string, boolean]> = [
+    ['203.0.113.7', true],
+    ['203.0.113.0/24', true],
+    ['2001:db8::/32', true],
+    ['::1', true],
+    ['203.0.113.0/33', false],
+    ['2001:db8::/129', false],
+    ['203.0.113.0/24/1', false],
+    ['203.0.113', false],
+    ["1.1.1.1'; --", false],
+  ];
+  const failed = [
+    ...cases.filter(([path, want]) => isLocalPath(path) !== want),
+    ...addresses.filter(([address, want]) => isAddressOrRange(address) !== want),
+  ];
+  const total = cases.length + addresses.length;
+  for (const [value] of failed) console.error(`  FAILED: ${value}`);
+  console.log(failed.length === 0 ? `input: ${total} checks pass` : `input: ${failed.length} of ${total} checks FAILED`);
   process.exitCode = failed.length === 0 ? 0 : 1;
 }

@@ -174,6 +174,15 @@ Some changes need rules of their own:
 
 **The first admin** has nobody to grant it, so it comes from the database: `npm run db:grant-admin -- <email>` (or `db:grant-admin:prod`). Its account must have signed in once. Every admin after that is granted from the website.
 
+### Logs
+
+`GET /v1/admin/logs` is one timeline of everything recorded, newest first, 50 at a time: every row of `audit.events`, merged in time order with each page's visits from `pages.views` and `pages.visit_events` (as `visit.page_viewed`, `visit.link_clicked` and `visit.left`). Each entry has a type (`auth`, `account`, `page`, `group`, `vrchat`, `admin`, `visit`, `system`, from the action's first word), a level from its result (info, warning for `denied` and `rate_limited`, error for `failure`), who acted, the target with a name when it is an account or page, the IP, browser, country, request id and the action's metadata.
+
+- **Filters**, all optional and combined: `from`/`to` (24 hours unless said), `type`, `action`, `result`, `user` (an account id or part of an email: events by or about that account), `page` (an id or a name, aliases included: events about the page and its visits), `ip` (an address or a range like `203.0.113.0/24`), `requestId`, and `field` with an optional `value` for any metadata key. A malformed one is a 400, never a database error.
+- **`next`** is the `at` of the last entry, to the microsecond; pass it back as `before` for the screen after.
+- **Every audit event keeps the IP and browser of whoever acted**, not only security events. Visits never do: they keep the visitor hash, shown in metadata as `visitor`, which still ties one visitor's views together.
+- **Refusals, rate limits and errors are logged too.** `ProblemDetailsFilter` writes `system.denied` (403), `system.rate_limited` (429) and `system.error` (5xx) with the method, the route's pattern (never its values), the status and, for an error, its class. The request id finds the full error in the process's own log. 400, 401 and 404 are ordinary traffic and are not logged.
+
 ### Refusals a client can act on
 
 Beyond the status code, `type` names the kind: `https://vrc.page/problems/<code>`, with one of the codes in `src/common/problem.ts` — `bot_check_failed`, `cooldown` (with `retryAfter`), `invalid_email`, `same_email`, `email_taken`, `signups_closed`, `pending_expired`, `wrong_code`, `code_expired`, `code_exhausted`, `provider_not_configured`, `not_connected`, `not_allowed`, `invalid_link`, `short_link`, `already_connected`, `vrchat_taken`, `vrchat_not_found`, `group_taken`, `not_group_owner`, `group_private`, `group_limit`, `no_such_page`, `invite_self`, `already_editor`, `already_invited`, `editor_limit`, `links_disabled`, `too_many_links`, `link_invalid`, `link_blocked`, `link_duplicate`, `label_too_long`, `not_a_picture`, `too_large`, `refresh_cooldown` (with `retryAfter`), `refresh_daily_limit`, `vrchat_gone`, `group_unclaimed`, `name_unavailable`, `name_cooldown`, `session_stale`, `not_signed_in`, `unavailable`. Anything else is `about:blank`, where the status says it all. A refusal about one item of a submitted list also carries `at`, that item's position counting from 0.
@@ -357,6 +366,7 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `DELETE /v1/admin/accounts/{accountId}/sessions` | Admins: sign it out everywhere |
 | `DELETE /v1/admin/accounts/{accountId}/vrchat` | Admins: disconnect its VRChat account |
 | `DELETE /v1/admin/accounts/{accountId}` | Admins: delete it and everything it owns |
+| `GET /v1/admin/logs` | Admins: everything recorded, every page visit included, newest first, with filters |
 | `GET /v1/admin/stats` | Admins: every page stat, plus countries, referrers, hours and recent visits; the whole site, or one page with `pageId` |
 | `GET /v1/admin/pages` | Admins: every page, whatever its visibility, 50 at a time |
 | `GET /v1/admin/pages/{pageId}` | Admins: one page with its owner, aliases, takedown and whether it is a home page example |
