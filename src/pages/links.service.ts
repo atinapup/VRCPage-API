@@ -27,6 +27,15 @@ export type SaveFailure =
 
 export type SaveResult = { status: 'ok'; links: OwnLink[] } | SaveFailure;
 
+/** Where a link goes, for the logs: its host without www. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'unknown';
+  }
+}
+
 @Injectable()
 export class LinksService {
   constructor(
@@ -105,15 +114,19 @@ export class LinksService {
       const before = await this.rows(trx, pageId);
       const byIdentity = new Map(before.map((row) => [linkIdentity(row.url), row]));
       const keep = new Set(wanted.map((link) => link.identity));
+      // Every event is about the page, so the page's logs find them; which
+      // link and where it goes are in metadata. Row history has the values.
+      const event = (action: string, link: string, url: string, metadata: Record<string, string | number> = {}) =>
+        this.audit.record(
+          context,
+          { action, actorType: 'account', actorAccountId: accountId, targetType: 'page', targetId: pageId, metadata: { link, host: hostOf(url), ...metadata } },
+          trx,
+        );
 
       for (const row of before) {
         if (keep.has(linkIdentity(row.url))) continue;
         await trx.deleteFrom('pages.links').where('id', '=', row.id).execute();
-        await this.audit.record(
-          context,
-          { action: 'link_item.removed', actorType: 'account', actorAccountId: accountId, targetType: 'link', targetId: row.id },
-          trx,
-        );
+        await event('link_item.removed', row.id, row.url);
       }
 
       for (const [position, link] of wanted.entries()) {
@@ -126,6 +139,13 @@ export class LinksService {
             .set({ url: link.url, label: link.label, isAdult: link.adult, isHidden: link.hidden, position, updatedAt: new Date() })
             .where('id', '=', existing.id)
             .execute();
+          const changed = [
+            existing.url !== link.url && 'url',
+            existing.label !== link.label && 'label',
+            existing.adult !== link.adult && 'adult',
+            existing.hidden !== link.hidden && 'hidden',
+          ].filter(Boolean);
+          if (changed.length > 0) await event('link_item.changed', existing.id, link.url, { changed: changed.join(',') });
           continue;
         }
         const added = await trx
@@ -133,9 +153,18 @@ export class LinksService {
           .values({ pageId, url: link.url, label: link.label, isAdult: link.adult, isHidden: link.hidden, position })
           .returning('id')
           .executeTakeFirstOrThrow();
+        await event('link_item.added', added.id, link.url);
+      }
+
+      // Moving links around is one event for the save, not one per link.
+      // Only links on both sides count: an added or removed one is not a move.
+      const keptIds = wanted.flatMap((link) => byIdentity.get(link.identity)?.id ?? []);
+      const kept = new Set(keptIds);
+      const was = before.map((row) => row.id).filter((id) => kept.has(id)).join(',');
+      if (was !== keptIds.join(',')) {
         await this.audit.record(
           context,
-          { action: 'link_item.added', actorType: 'account', actorAccountId: accountId, targetType: 'link', targetId: added.id },
+          { action: 'link_item.reordered', actorType: 'account', actorAccountId: accountId, targetType: 'page', targetId: pageId, metadata: { count: kept.size } },
           trx,
         );
       }

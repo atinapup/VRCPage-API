@@ -2,7 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { sql, type RawBuilder } from 'kysely';
 import { isAddressOrRange } from '../common/input.js';
 import { Database } from '../database/database.js';
-import { LOG_TYPES, type LogEntry, type LogPage, type LogQuery, type LogType } from './logs.dto.js';
+import { imagePath } from '../vrchat/images.js';
+import { LOG_TYPES, type LogChange, type LogEntry, type LogPage, type LogQuery, type LogType } from './logs.dto.js';
 
 const PAGE_SIZE = 50;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -177,7 +178,11 @@ export class LogsService {
                    'success' AS result, 'anonymous' AS actor_type, NULL::uuid AS actor_account_id,
                    NULL::inet AS ip, NULL::text AS user_agent, NULL::text AS country,
                    'page' AS target_type, x.page_id::text AS target_id, NULL::text AS request_id,
-                   jsonb_strip_nulls(jsonb_build_object('visit', x.visit_id, 'url', x.link_url, 'seconds', x.seconds)) AS metadata
+                   jsonb_strip_nulls(jsonb_build_object(
+                     'visit', x.visit_id, 'visitor', left(encode(x.visitor_hash, 'hex'), 12),
+                     'url', x.link_url, 'host', lower(regexp_replace(substring(x.link_url FROM '^https://([^/:?#]+)'), '^www[.]', '')),
+                     'seconds', x.seconds
+                   )) AS metadata
               FROM pages.visit_events x`)}
         ) merged
         ORDER BY at DESC, id
@@ -201,8 +206,9 @@ export class LogsService {
 
     const [rows, choices] = await Promise.all([query.execute(this.db).then((result) => result.rows), actions]);
     const shown = rows.slice(0, PAGE_SIZE);
+    const changes = await this.changes(shown);
     return {
-      logs: shown.map((row) => this.entry(row)),
+      logs: shown.map((row) => this.entry(row, changes)),
       next: rows.length > PAGE_SIZE ? shown[shown.length - 1].at : null,
       actions: choices,
     };
@@ -256,7 +262,80 @@ export class LogsService {
     return [...new Set([...rows.map((row) => row.action), ...VISIT_ACTIONS])].sort();
   }
 
-  private entry(row: Row): LogEntry {
+  /**
+   * What each shown entry's request changed, from audit.row_changes, which
+   * the database writes for every tracked table with the same request id.
+   * Picture columns hold image ids, so those are looked up to the address the
+   * picture is served at, for as long as it is kept.
+   */
+  private async changes(rows: Row[]): Promise<Map<string, LogChange[]>> {
+    const requests = [...new Set(rows.flatMap((row) => (row.requestId ? [row.requestId] : [])))];
+    const byRequest = new Map<string, LogChange[]>();
+    if (requests.length === 0) return byRequest;
+
+    const times = rows.map((row) => new Date(row.at).getTime());
+    const hour = 3_600_000;
+    const found = await this.db
+      .selectFrom('audit.rowChanges')
+      .select(['requestId', 'schemaName', 'tableName', 'operation', 'rowKey', 'oldValues', 'newValues'])
+      .where('requestId', 'in', requests)
+      // The rows commit with their event; the bounds only let Postgres skip months.
+      .where('changedAt', '>=', new Date(Math.min(...times) - hour))
+      .where('changedAt', '<', new Date(Math.max(...times) + hour))
+      .orderBy('changedAt')
+      .orderBy('id')
+      .execute();
+
+    const imageIds = new Set<string>();
+    for (const change of found) {
+      for (const values of [change.oldValues, change.newValues] as Array<Record<string, unknown> | null>) {
+        for (const [name, value] of Object.entries(values ?? {})) {
+          if (name.endsWith('ImageId') && typeof value === 'string') imageIds.add(value);
+        }
+      }
+    }
+    const images = new Map<string, string | null>();
+    if (imageIds.size > 0) {
+      const rows = await this.db.selectFrom('vrchat.images').select(['id', 'sha256']).where('id', 'in', [...imageIds]).execute();
+      for (const image of rows) images.set(image.id, imagePath(image.sha256));
+    }
+
+    const shown = (value: unknown): string | null =>
+      value === null || value === undefined ? null : typeof value === 'string' ? value : JSON.stringify(value);
+    const picture = (name: string, value: unknown) =>
+      name.endsWith('ImageId') && typeof value === 'string' ? (images.get(value) ?? null) : null;
+
+    for (const change of found) {
+      const before = (change.oldValues ?? {}) as Record<string, unknown>;
+      const after = (change.newValues ?? {}) as Record<string, unknown>;
+      const key = (change.rowKey ?? {}) as Record<string, unknown>;
+      const names = Object.keys(change.operation === 'delete' ? before : after).filter(
+        (name) => !(name in key) && name !== 'createdAt' && name !== 'updatedAt',
+      );
+      const entry: LogChange = {
+        table: `${change.schemaName}.${change.tableName}`,
+        operation: change.operation,
+        key,
+        fields: names.map((name) => ({
+          name,
+          before: shown(before[name]),
+          after: shown(after[name]),
+          beforeImage: picture(name, before[name]),
+          afterImage: picture(name, after[name]),
+        })),
+      };
+      const list = byRequest.get(change.requestId!) ?? [];
+      list.push(entry);
+      byRequest.set(change.requestId!, list);
+    }
+    return byRequest;
+  }
+
+  private entry(row: Row, changes: Map<string, LogChange[]>): LogEntry {
+    const all = row.requestId ? (changes.get(row.requestId) ?? []) : [];
+    // A link's event shows its own link; anything else, all its request did.
+    const link = row.metadata?.link;
+    const own = typeof link === 'string' ? all.filter((change) => change.table === 'pages.links' && change.key.id === link) : all;
     return {
       id: row.id,
       at: row.at,
@@ -272,6 +351,7 @@ export class LogsService {
       target: row.targetType && row.targetId ? { type: row.targetType, id: row.targetId, label: row.targetLabel, slug: row.targetSlug } : null,
       requestId: row.requestId,
       metadata: row.metadata ?? {},
+      changes: own.slice(0, 20),
     };
   }
 }

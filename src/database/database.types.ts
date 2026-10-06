@@ -586,6 +586,10 @@ export interface PagesVisitEvents {
    */
   seconds: number | null;
   visitId: string;
+  /**
+   * Same as pages.views.visitor_hash: an HMAC of the address with a monthly key. Null on rows from before it was kept.
+   */
+  visitorHash: Buffer | null;
 }
 
 export interface VrchatApiCalls {

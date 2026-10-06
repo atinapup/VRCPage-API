@@ -83,6 +83,9 @@ export class StatsService {
     }
 
     const actor = { requestId: context.requestId, type: 'anonymous' as const, accountId: null };
+    // Every row says which visitor, by the same hash, so a view, the links
+    // opened after it and the leave can be followed as one person's visit.
+    const visitor = visitorHash(this.config.auth.secret, addressKey(context.ip), new Date());
     await this.db.write(actor, async (trx) => {
       if (event.kind === 'view') {
         await trx
@@ -90,16 +93,16 @@ export class StatsService {
           .values({
             pageId,
             visitId: event.visitId,
-            visitorHash: visitorHash(this.config.auth.secret, addressKey(context.ip), new Date()),
+            visitorHash: visitor,
             country: country(event.country),
             referrerHost: referrerHost(event.referrer),
           })
           .execute();
       } else if (event.kind === 'click') {
-        await trx.insertInto('pages.visitEvents').values({ pageId, visitId: event.visitId, kind: 'click', linkUrl: link }).execute();
+        await trx.insertInto('pages.visitEvents').values({ pageId, visitId: event.visitId, visitorHash: visitor, kind: 'click', linkUrl: link }).execute();
       } else {
         const seconds = Math.min(Math.max(Math.round(event.seconds), 0), MAX_SECONDS);
-        await trx.insertInto('pages.visitEvents').values({ pageId, visitId: event.visitId, kind: 'leave', seconds }).execute();
+        await trx.insertInto('pages.visitEvents').values({ pageId, visitId: event.visitId, visitorHash: visitor, kind: 'leave', seconds }).execute();
       }
     });
   }

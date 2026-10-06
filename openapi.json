@@ -5347,6 +5347,74 @@
           "id"
         ]
       },
+      "LogChangeField": {
+        "type": "object",
+        "properties": {
+          "before": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null when there was nothing: an added row, or a column that was empty."
+          },
+          "after": {
+            "type": "string",
+            "nullable": true
+          },
+          "beforeImage": {
+            "type": "string",
+            "nullable": true,
+            "description": "For a picture column, where the picture is served, while it still exists."
+          },
+          "afterImage": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "The column, in camelCase: label, url, pictureImageId, slug..."
+          }
+        },
+        "required": [
+          "before",
+          "after",
+          "beforeImage",
+          "afterImage",
+          "name"
+        ]
+      },
+      "LogChange": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "enum": [
+              "insert",
+              "update",
+              "delete"
+            ],
+            "type": "string"
+          },
+          "key": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The row's key columns."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LogChangeField"
+            }
+          },
+          "table": {
+            "type": "string",
+            "description": "schema.table, such as pages.links."
+          }
+        },
+        "required": [
+          "operation",
+          "key",
+          "fields",
+          "table"
+        ]
+      },
       "LogEntry": {
         "type": "object",
         "properties": {
@@ -5431,6 +5499,13 @@
             "additionalProperties": true,
             "description": "Detail particular to the action. Never a secret."
           },
+          "changes": {
+            "description": "What the request changed in the database, before and after, from row\nhistory. For a link's event, only that link's row; otherwise everything\nthe request changed, up to 20 rows. Empty for visits.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LogChange"
+            }
+          },
           "id": {
             "type": "string",
             "description": "Unique within the log; not an id anything else uses."
@@ -5456,6 +5531,7 @@
           "target",
           "requestId",
           "metadata",
+          "changes",
           "id",
           "at",
           "action"

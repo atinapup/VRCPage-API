@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { Audit } from '../audit/audit.js';
 import type { RequestContext } from '../common/request-context.js';
+import type { Kysely } from 'kysely';
 import { Database } from '../database/database.js';
+import type { DB } from '../database/database.types.js';
 import { VRChatImages } from '../vrchat/images.js';
 import { VRChatReader } from '../vrchat/reader.js';
 import { PagesService } from './pages.service.js';
@@ -71,6 +73,21 @@ const MAX_SLOT_WAIT_SECONDS = 300;
  * the turn freeing rather than up to a minute after.
  */
 const DRAIN_INTERVAL_MS = 10_000;
+
+/** Where some links go, for a log line: their hosts, without www, comma separated. */
+function hosts(urls: string[]): string {
+  return [
+    ...new Set(
+      urls.map((url) => {
+        try {
+          return new URL(/^[a-z]+:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, '');
+        } catch {
+          return 'unknown';
+        }
+      }),
+    ),
+  ].join(', ');
+}
 
 @Injectable()
 export class RefreshService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -289,6 +306,12 @@ export class RefreshService implements OnApplicationBootstrap, OnApplicationShut
     const outcome = await this.db.write(actor, async (trx) => {
       if (userRead?.ok) {
         const value = userRead.value;
+        const was = await trx
+          .selectFrom('vrchat.users')
+          .select(['displayName', 'bio', 'bioLinks', 'iconImageId', 'bannerImageId'])
+          .where('id', '=', value.id)
+          .executeTakeFirst();
+        const images = await this.images.columns(trx, pictures);
         await trx
           .updateTable('vrchat.users')
           .set({
@@ -303,13 +326,22 @@ export class RefreshService implements OnApplicationBootstrap, OnApplicationShut
             representedGroupId: value.representedGroup?.id ?? null,
             representedGroupName: value.representedGroup?.name ?? null,
             languages: value.languages,
-            ...(await this.images.columns(trx, pictures)),
+            ...images,
             fetchedAt: now,
             lastFetchError: null,
             lastFetchErrorAt: null,
           })
           .where('id', '=', value.id)
           .execute();
+        if (was) {
+          await this.recordChanges(context, accountId, pageId, 'profile.vrchat_changed', trx, {
+            name: [was.displayName, value.displayName],
+            links: [was.bioLinks, value.bioLinks],
+            bio: was.bio !== value.bio,
+            picture: images.iconImageId !== undefined && images.iconImageId !== was.iconImageId,
+            banner: images.bannerImageId !== undefined && images.bannerImageId !== was.bannerImageId,
+          });
+        }
         return 'ok' as const;
       }
 
@@ -337,6 +369,12 @@ export class RefreshService implements OnApplicationBootstrap, OnApplicationShut
         return 'unclaimed' as const;
       }
 
+      const was = await trx
+        .selectFrom('vrchat.groups')
+        .select(['name', 'description', 'links', 'iconImageId', 'bannerImageId'])
+        .where('id', '=', value.id)
+        .executeTakeFirst();
+      const images = await this.images.columns(trx, pictures);
       await trx
         .updateTable('vrchat.groups')
         .set({
@@ -351,13 +389,22 @@ export class RefreshService implements OnApplicationBootstrap, OnApplicationShut
           isVerified: value.isVerified,
           privacy: value.privacy,
           ownerVrchatUserId: value.ownerId,
-          ...(await this.images.columns(trx, pictures)),
+          ...images,
           fetchedAt: now,
           lastFetchError: null,
           lastFetchErrorAt: null,
         })
         .where('id', '=', value.id)
         .execute();
+      if (was) {
+        await this.recordChanges(context, accountId, pageId, 'group.vrchat_changed', trx, {
+          name: [was.name, value.name],
+          links: [was.links, value.links],
+          bio: was.description !== value.description,
+          picture: images.iconImageId !== undefined && images.iconImageId !== was.iconImageId,
+          banner: images.bannerImageId !== undefined && images.bannerImageId !== was.bannerImageId,
+        });
+      }
 
       // A group made private on VRChat is not published here either. The
       // owner can open it up again once it is public there.
@@ -378,6 +425,35 @@ export class RefreshService implements OnApplicationBootstrap, OnApplicationShut
       metadata: { lane: 'manual' },
     });
     return outcome === 'unclaimed' ? { status: 'unclaimed' } : { status: 'ok', refreshedAt: now.toISOString() };
+  }
+
+  /**
+   * What a refresh changed, as one event, or nothing when VRChat had nothing
+   * new. vrchat.users and vrchat.groups keep no history of their snapshot on
+   * purpose (old bios are a privacy and volume problem), so this is the only
+   * record: the name before and after, how many links came and went and
+   * where to, and whether the bio, picture or banner changed, never the bio.
+   */
+  private async recordChanges(
+    context: RequestContext,
+    accountId: string,
+    pageId: string,
+    action: 'profile.vrchat_changed' | 'group.vrchat_changed',
+    trx: Kysely<DB>,
+    change: { name: [string, string]; links: [string[], string[]]; bio: boolean; picture: boolean; banner: boolean },
+  ): Promise<void> {
+    const [before, after] = change.links;
+    const added = after.filter((url) => !before.includes(url));
+    const removed = before.filter((url) => !after.includes(url));
+    const metadata: Record<string, string | number | boolean> = {};
+    if (change.name[0] !== change.name[1]) Object.assign(metadata, { nameBefore: change.name[0], nameAfter: change.name[1] });
+    if (added.length > 0) Object.assign(metadata, { linksAdded: added.length, addedHosts: hosts(added) });
+    if (removed.length > 0) Object.assign(metadata, { linksRemoved: removed.length, removedHosts: hosts(removed) });
+    if (change.bio) metadata.bio = true;
+    if (change.picture) metadata.picture = true;
+    if (change.banner) metadata.banner = true;
+    if (Object.keys(metadata).length === 0) return;
+    await this.audit.record(context, { action, actorType: 'account', actorAccountId: accountId, targetType: 'page', targetId: pageId, metadata }, trx);
   }
 
   /**

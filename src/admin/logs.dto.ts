@@ -22,6 +22,35 @@ export class LogTarget {
   slug!: string | null;
 }
 
+/** One column a change touched, before and after, as text. */
+export class LogChangeField {
+  /** The column, in camelCase: label, url, pictureImageId, slug... */
+  name!: string;
+  /** Null when there was nothing: an added row, or a column that was empty. */
+  @ApiProperty({ type: String, nullable: true })
+  before!: string | null;
+  @ApiProperty({ type: String, nullable: true })
+  after!: string | null;
+  /** For a picture column, where the picture is served, while it still exists. */
+  @ApiProperty({ type: String, nullable: true })
+  beforeImage!: string | null;
+  @ApiProperty({ type: String, nullable: true })
+  afterImage!: string | null;
+}
+
+/** A row the request added, changed or removed, from audit.row_changes. */
+export class LogChange {
+  /** schema.table, such as pages.links. */
+  table!: string;
+  @ApiProperty({ enum: ['insert', 'update', 'delete'] })
+  operation!: 'insert' | 'update' | 'delete';
+  /** The row's key columns. */
+  @ApiProperty({ type: 'object', additionalProperties: true })
+  key!: Record<string, unknown>;
+  @ApiProperty({ type: [LogChangeField] })
+  fields!: LogChangeField[];
+}
+
 /** One thing that happened, from the audit log or a page's visits. */
 export class LogEntry {
   /** Unique within the log; not an id anything else uses. */
@@ -55,6 +84,13 @@ export class LogEntry {
   /** Detail particular to the action. Never a secret. */
   @ApiProperty({ type: 'object', additionalProperties: true })
   metadata!: Record<string, unknown>;
+  /**
+   * What the request changed in the database, before and after, from row
+   * history. For a link's event, only that link's row; otherwise everything
+   * the request changed, up to 20 rows. Empty for visits.
+   */
+  @ApiProperty({ type: [LogChange] })
+  changes!: LogChange[];
 }
 
 export class LogPage {
