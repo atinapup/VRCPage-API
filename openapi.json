@@ -1816,7 +1816,7 @@
             }
           }
         },
-        "summary": "How opaque the background is, a whole number of percent from 0 to 100. 25 until changed.",
+        "summary": "How opaque the background is, a whole number of percent from 0 to 100. 15 until changed.",
         "tags": [
           "me"
         ]

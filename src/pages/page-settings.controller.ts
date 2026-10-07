@@ -121,7 +121,7 @@ export class PageSettingsController {
     return this.removeImage(request, viewer, pageId, 'background');
   }
 
-  /** How opaque the background is, a whole number of percent from 0 to 100. 25 until changed. */
+  /** How opaque the background is, a whole number of percent from 0 to 100. 15 until changed. */
   @Put('background-opacity')
   @HttpCode(204)
   async backgroundOpacity(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string, @Body() body: BackgroundOpacityRequest): Promise<void> {

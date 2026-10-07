@@ -1,12 +1,12 @@
 -- migrate:up
 
 -- A background of the page's own, uploaded on vrc.page and drawn behind the
--- whole page, and how strongly: 0 to 100 percent opaque. 25 by default, so
+-- whole page, and how strongly: 0 to 100 percent opaque. 15 by default, so
 -- a background sits back behind the card rather than competing with it.
 
 ALTER TABLE pages.pages
   ADD COLUMN background_image_id uuid REFERENCES vrchat.images ON DELETE RESTRICT,
-  ADD COLUMN background_opacity smallint NOT NULL DEFAULT 25
+  ADD COLUMN background_opacity smallint NOT NULL DEFAULT 15
     CHECK (background_opacity BETWEEN 0 AND 100);
 COMMENT ON COLUMN pages.pages.background_image_id IS 'A background uploaded on vrc.page, drawn behind the whole page.';
 COMMENT ON COLUMN pages.pages.background_opacity IS 'How opaque the background is, in percent.';
