@@ -29,8 +29,11 @@ import { VRChatClient } from './client.js';
 const ICON_BOX = 512;
 /** Banners fill a card about 800px wide. */
 const BANNER_BOX = 1600;
-/** WebP quality: indistinguishable from the original at these sizes. */
-const QUALITY = 82;
+/**
+ * WebP settings. Quality 82 showed blocking on flat colour and soft edges;
+ * 90 with sharp's smart chroma subsampling keeps them clean.
+ */
+const WEBP = { quality: 90, smartSubsample: true };
 /** Larger than any real icon or banner; refuses decompression bombs. */
 const MAX_PIXELS = 50_000_000;
 
@@ -62,7 +65,7 @@ export async function encodeUpload(original: Buffer, kind: 'banner' | 'picture')
           ? { width: BANNER_BOX, height: BANNER_BOX, fit: 'inside', withoutEnlargement: true }
           : { width: ICON_BOX, height: ICON_BOX, fit: 'cover', withoutEnlargement: false },
       )
-      .webp({ quality: QUALITY })
+      .webp(WEBP)
       .toBuffer({ resolveWithObject: true });
     return { sha256: createHash('sha256').update(data).digest(), bytes: data, width: info.width, height: info.height };
   } catch {
@@ -122,7 +125,7 @@ export class VRChatImages {
       const { data, info } = await sharp(original, { limitInputPixels: MAX_PIXELS })
         .rotate()
         .resize({ width: box, height: box, fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: QUALITY })
+        .webp(WEBP)
         .toBuffer({ resolveWithObject: true });
       return { sourceUrl: url, sha256: createHash('sha256').update(data).digest(), bytes: data, width: info.width, height: info.height };
     } catch (error) {
