@@ -489,6 +489,14 @@ export interface PagesPages {
    */
   accent: string | null;
   /**
+   * A background uploaded on vrc.page, drawn behind the whole page.
+   */
+  backgroundImageId: string | null;
+  /**
+   * How opaque the background is, in percent.
+   */
+  backgroundOpacity: Generated<number>;
+  /**
    * A banner uploaded on vrc.page, shown instead of the VRChat banner.
    */
   bannerImageId: string | null;

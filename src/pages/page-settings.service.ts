@@ -22,13 +22,13 @@ import { PagesService } from './pages.service.js';
 /** #rrggbb, lowercase on the way in. */
 const ACCENT = /^#[0-9a-f]{6}$/;
 
-/** No picture or banner needs to be bigger than this to look right. */
+/** No picture, banner or background needs to be bigger than this to look right. */
 export const IMAGE_LIMIT = 8 * 1024 * 1024;
 
-/** A page's own picture and banner, uploaded on vrc.page. */
-export type PageImage = 'picture' | 'banner';
+/** A page's own picture, banner and background, uploaded on vrc.page. */
+export type PageImage = 'picture' | 'banner' | 'background';
 
-const COLUMN = { picture: 'pictureImageId', banner: 'bannerImageId' } as const;
+const COLUMN = { picture: 'pictureImageId', banner: 'bannerImageId', background: 'backgroundImageId' } as const;
 
 const NOTHING_BLOCKED: ReadonlySet<string> = new Set();
 
@@ -94,8 +94,17 @@ export class PageSettingsService {
     });
   }
 
+  /** How opaque the page's background is: a whole number of percent, 0 to 100. */
+  async setBackgroundOpacity(context: RequestContext, accountId: string, pageId: string, opacity: number): Promise<SettingResult | 'bad_opacity'> {
+    if (!Number.isInteger(opacity) || opacity < 0 || opacity > 100) return 'bad_opacity';
+    return this.onPage(context, accountId, pageId, 'page.background_opacity_changed', { opacity }, async (trx) => {
+      await trx.updateTable('pages.pages').set({ backgroundOpacity: opacity }).where('id', '=', pageId).execute();
+    });
+  }
+
   /**
-   * A picture or banner of the page's own, shown instead of VRChat's.
+   * A picture, banner or background of the page's own, the first two shown
+   * instead of VRChat's.
    * Re-encoded like VRChat's (src/vrchat/images.ts) before anything is
    * written; the one it replaces goes as soon as nothing uses it (migration
    * 20261003090000).
@@ -114,7 +123,7 @@ export class PageSettingsService {
     return result === 'ok' ? { status: 'ok', url: imagePath(encoded.sha256)! } : { status: 'not_found' };
   }
 
-  /** Back to VRChat's picture or banner. */
+  /** Back to VRChat's picture or banner, or no background. */
   removeImage(context: RequestContext, accountId: string, pageId: string, kind: PageImage): Promise<SettingResult> {
     return this.onPage(context, accountId, pageId, `page.${kind}_changed`, { uploaded: false }, async (trx) => {
       await trx.updateTable('pages.pages').set({ [COLUMN[kind]]: null }).where('id', '=', pageId).execute();

@@ -1676,6 +1676,152 @@
         ]
       }
     },
+    "/v1/me/pages/{pageId}/background": {
+      "put": {
+        "operationId": "pageSettingsBackground",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/gif": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadedImage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "A background drawn behind the whole page: the picture's own bytes as the\nbody, PNG, JPEG, WebP or GIF, up to 8 MB. Fitted inside 2560 pixels.",
+        "tags": [
+          "me"
+        ]
+      },
+      "delete": {
+        "operationId": "pageSettingsRemoveBackground",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Take the page's background off.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/pages/{pageId}/background-opacity": {
+      "put": {
+        "operationId": "pageSettingsBackgroundOpacity",
+        "parameters": [
+          {
+            "name": "pageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackgroundOpacityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error, as RFC 9457 Problem Details.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "How opaque the background is, a whole number of percent from 0 to 100. 25 until changed.",
+        "tags": [
+          "me"
+        ]
+      }
+    },
     "/v1/me/preferences": {
       "get": {
         "operationId": "preferencesPreferences",
@@ -4104,6 +4250,17 @@
             "nullable": true,
             "description": "A picture uploaded on vrc.page. When there is one, it is the page's picture rather than VRChat's icon."
           },
+          "backgroundUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "A background uploaded on vrc.page, drawn behind the whole page."
+          },
+          "backgroundOpacity": {
+            "type": "integer",
+            "description": "How opaque the background is, percent from 0 to 100.",
+            "minimum": 0,
+            "maximum": 100
+          },
           "vrchatUserId": {
             "type": "string"
           },
@@ -4152,6 +4309,8 @@
           "accent",
           "ownBannerUrl",
           "ownPictureUrl",
+          "backgroundUrl",
+          "backgroundOpacity",
           "vrchatUserId",
           "displayName",
           "ageVerified",
@@ -4233,6 +4392,17 @@
             "nullable": true,
             "description": "A picture uploaded on vrc.page. When there is one, it is the page's picture rather than VRChat's icon."
           },
+          "backgroundUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "A background uploaded on vrc.page, drawn behind the whole page."
+          },
+          "backgroundOpacity": {
+            "type": "integer",
+            "description": "How opaque the background is, percent from 0 to 100.",
+            "minimum": 0,
+            "maximum": 100
+          },
           "vrchatGroupId": {
             "type": "string"
           },
@@ -4285,6 +4455,8 @@
           "accent",
           "ownBannerUrl",
           "ownPictureUrl",
+          "backgroundUrl",
+          "backgroundOpacity",
           "vrchatGroupId",
           "name",
           "shortCode",
@@ -4899,6 +5071,20 @@
         },
         "required": [
           "url"
+        ]
+      },
+      "BackgroundOpacityRequest": {
+        "type": "object",
+        "properties": {
+          "opacity": {
+            "type": "integer",
+            "description": "Percent, a whole number from 0 to 100.",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "opacity"
         ]
       },
       "Preferences": {

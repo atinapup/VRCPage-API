@@ -29,6 +29,8 @@ import { VRChatClient } from './client.js';
 const ICON_BOX = 512;
 /** Banners fill a card about 800px wide. */
 const BANNER_BOX = 1600;
+/** Backgrounds fill the window, dimmed; this covers a 1440p screen. */
+const BACKGROUND_BOX = 2560;
 /**
  * WebP settings. Quality 82 showed blocking on flat colour and soft edges;
  * 90 with sharp's smart chroma subsampling keeps them clean.
@@ -50,20 +52,21 @@ type Picture = { id: string } | Encoded | null | undefined;
 export type Pictures = { icon: Picture; banner: Picture };
 
 /**
- * A picture or banner someone uploaded on vrc.page, made like VRChat's:
- * upright, WebP, the first frame of an animation. A banner is fitted inside
- * BANNER_BOX; a picture is cut to a square from its middle, ICON_BOX across,
- * since it is always shown round or rounded. Null when sharp can't read it
- * as a picture.
+ * A picture, banner or background someone uploaded on vrc.page, made like
+ * VRChat's: upright, WebP, the first frame of an animation. A banner is
+ * fitted inside BANNER_BOX and a background inside BACKGROUND_BOX; a picture
+ * is cut to a square from its middle, ICON_BOX across, since it is always
+ * shown round or rounded. Null when sharp can't read it as a picture.
  */
-export async function encodeUpload(original: Buffer, kind: 'banner' | 'picture'): Promise<{ sha256: Buffer; bytes: Buffer; width: number; height: number } | null> {
+export async function encodeUpload(original: Buffer, kind: 'banner' | 'picture' | 'background'): Promise<{ sha256: Buffer; bytes: Buffer; width: number; height: number } | null> {
   try {
+    const box = kind === 'background' ? BACKGROUND_BOX : BANNER_BOX;
     const { data, info } = await sharp(original, { limitInputPixels: MAX_PIXELS })
       .rotate()
       .resize(
-        kind === 'banner'
-          ? { width: BANNER_BOX, height: BANNER_BOX, fit: 'inside', withoutEnlargement: true }
-          : { width: ICON_BOX, height: ICON_BOX, fit: 'cover', withoutEnlargement: false },
+        kind === 'picture'
+          ? { width: ICON_BOX, height: ICON_BOX, fit: 'cover', withoutEnlargement: false }
+          : { width: box, height: box, fit: 'inside', withoutEnlargement: true },
       )
       .webp(WEBP)
       .toBuffer({ resolveWithObject: true });

@@ -164,12 +164,15 @@ export class PagesService {
       .leftJoin('vrchat.images as banner', 'banner.id', 'u.bannerImageId')
       .leftJoin('vrchat.images as ownBanner', 'ownBanner.id', 'p.bannerImageId')
       .leftJoin('vrchat.images as ownPicture', 'ownPicture.id', 'p.pictureImageId')
+      .leftJoin('vrchat.images as background', 'background.id', 'p.backgroundImageId')
       .select([
         'p.visibility',
         'p.socialsEnabled',
         'p.accent',
+        'p.backgroundOpacity',
         'ownBanner.sha256 as ownBannerSha256',
         'ownPicture.sha256 as ownPictureSha256',
+        'background.sha256 as backgroundSha256',
         'u.id',
         'u.displayName',
         'u.pronouns',
@@ -216,6 +219,8 @@ export class PagesService {
       accent: row.accent,
       ownBannerUrl: imagePath(row.ownBannerSha256),
       ownPictureUrl: imagePath(row.ownPictureSha256),
+      backgroundUrl: imagePath(row.backgroundSha256),
+      backgroundOpacity: row.backgroundOpacity,
     };
   }
 
@@ -229,12 +234,15 @@ export class PagesService {
       .leftJoin('vrchat.images as banner', 'banner.id', 'g.bannerImageId')
       .leftJoin('vrchat.images as ownBanner', 'ownBanner.id', 'p.bannerImageId')
       .leftJoin('vrchat.images as ownPicture', 'ownPicture.id', 'p.pictureImageId')
+      .leftJoin('vrchat.images as background', 'background.id', 'p.backgroundImageId')
       .select([
         'p.visibility',
         'p.socialsEnabled',
         'p.accent',
+        'p.backgroundOpacity',
         'ownBanner.sha256 as ownBannerSha256',
         'ownPicture.sha256 as ownPictureSha256',
+        'background.sha256 as backgroundSha256',
         'g.id',
         'g.name',
         'g.shortCode',
@@ -281,6 +289,8 @@ export class PagesService {
       accent: row.accent,
       ownBannerUrl: imagePath(row.ownBannerSha256),
       ownPictureUrl: imagePath(row.ownPictureSha256),
+      backgroundUrl: imagePath(row.backgroundSha256),
+      backgroundOpacity: row.backgroundOpacity,
     };
   }
 

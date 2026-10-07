@@ -66,6 +66,12 @@ export class UserPage {
   /** A picture uploaded on vrc.page. When there is one, it is the page's picture rather than VRChat's icon. */
   @ApiProperty({ type: String, nullable: true })
   ownPictureUrl!: string | null;
+  /** A background uploaded on vrc.page, drawn behind the whole page. */
+  @ApiProperty({ type: String, nullable: true })
+  backgroundUrl!: string | null;
+  /** How opaque the background is, percent from 0 to 100. */
+  @ApiProperty({ type: 'integer', minimum: 0, maximum: 100 })
+  backgroundOpacity!: number;
 }
 
 export class GroupOwner {
@@ -114,6 +120,12 @@ export class GroupPage {
   /** A picture uploaded on vrc.page. When there is one, it is the page's picture rather than VRChat's icon. */
   @ApiProperty({ type: String, nullable: true })
   ownPictureUrl!: string | null;
+  /** A background uploaded on vrc.page, drawn behind the whole page. */
+  @ApiProperty({ type: String, nullable: true })
+  backgroundUrl!: string | null;
+  /** How opaque the background is, percent from 0 to 100. */
+  @ApiProperty({ type: 'integer', minimum: 0, maximum: 100 })
+  backgroundOpacity!: number;
 }
 
 /**

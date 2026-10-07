@@ -248,6 +248,7 @@ VRChat icons and banners are copied, never linked: a public page must not make a
 - **Kept when a download fails.** The old picture beats none; a picture VRChat no longer has is removed.
 - **Deleted by the database.** A trigger (`internal.drop_unused_images`, migration `20260929130000`) deletes a picture the moment no user or group uses it, which covers a changed picture, a disconnect, an unclaimed group and a deleted account, whose cascade arrives there too. Users and groups hold their pictures with `ON DELETE RESTRICT`, so nothing can delete one still on a page.
 - **Uploaded pictures and banners** (`PUT /v1/me/pages/{pageId}/picture` and `/banner`, the picture's own bytes as the body, PNG, JPEG, WebP or GIF up to 8 MB) go through the same encoding, except that a picture is cut to a 512px square from its middle. They are stored with no `source_url` and hang off `pages.pages.picture_image_id` and `banner_image_id`. A page's own wins over VRChat's (`avatarUrl` or `iconUrl`, and `bannerUrl`; `ownPictureUrl` and `ownBannerUrl` are the uploaded ones), and `DELETE` goes back to VRChat's. The clean-up trigger checks pages' own pictures too (migrations `20261002090300`, `20261003090000`).
+- **Uploaded backgrounds** (`PUT /v1/me/pages/{pageId}/background`, the same body and limits) are fitted inside 2560px, never cropped, and hang off `pages.pages.background_image_id`; `DELETE` takes it off. Pages carry `backgroundUrl` and `backgroundOpacity`, a whole number of percent set with `PUT /v1/me/pages/{pageId}/background-opacity` (`{opacity: 0-100}`), 25 until changed. The website draws it behind the whole page (migration `20261007090000`).
 - **Served** by `GET /v1/images/{sha256 hex}.webp` with a thirty-day `Cache-Control`, and the website serves that at `/images/<file>`. Pages get the relative address, which `next/image` optimizes like any local picture. Thirty days is the spec's limit for a deleted account's pictures leaving every cache. The route is not rate limited: it is one indexed read, and most requests come from the website's optimizer, all from one address.
 
 ## Appearance and accessibility
@@ -344,6 +345,8 @@ Every message vrc.page sends goes through `MailService` (`src/mail/`) and lands 
 | `PUT /v1/me/pages/{pageId}/accent` | The page's accent colour, or null. Owners and editors |
 | `PUT`, `DELETE /v1/me/pages/{pageId}/picture` | A picture of the page's own, shown instead of VRChat's. Owners and editors |
 | `PUT`, `DELETE /v1/me/pages/{pageId}/banner` | A banner of the page's own, shown instead of VRChat's. Owners and editors |
+| `PUT`, `DELETE /v1/me/pages/{pageId}/background` | A background behind the whole page. Owners and editors |
+| `PUT /v1/me/pages/{pageId}/background-opacity` | How opaque the background is, 0 to 100 percent. Owners and editors |
 | `PUT /v1/me/pages/{pageId}/visibility` | Public, unlisted or private. Owners only; an editor gets `not_allowed` |
 | `PATCH /v1/me/notification-preferences` | Change some of them; the answer is all of them |
 | `DELETE /v1/me/vrchat` | Disconnect VRChat, which takes the page and its groups with it |

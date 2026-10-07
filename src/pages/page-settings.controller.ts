@@ -7,7 +7,7 @@ import { optionalFlag, text } from '../common/input.js';
 import { Problem } from '../common/problem.js';
 import { requestContext } from '../common/request-context.js';
 import { uploadedBytes } from '../common/upload.js';
-import { AccentRequest, HiddenLinkRequest, Preferences, UploadedImage, PreferencesPatch, SocialsRequest } from './page-settings.dto.js';
+import { AccentRequest, BackgroundOpacityRequest, HiddenLinkRequest, Preferences, UploadedImage, PreferencesPatch, SocialsRequest } from './page-settings.dto.js';
 import { IMAGE_LIMIT, PageSettingsService, type PageImage } from './page-settings.service.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -99,6 +99,37 @@ export class PageSettingsController {
   @HttpCode(204)
   removePicture(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string): Promise<void> {
     return this.removeImage(request, viewer, pageId, 'picture');
+  }
+
+  /**
+   * A background drawn behind the whole page: the picture's own bytes as the
+   * body, PNG, JPEG, WebP or GIF, up to 8 MB. Fitted inside 2560 pixels.
+   */
+  @Put('background')
+  @HttpCode(200)
+  @ApiConsumes('image/png', 'image/jpeg', 'image/webp', 'image/gif')
+  @ApiBody({ schema: { type: 'string', format: 'binary' } })
+  background(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string): Promise<UploadedImage> {
+    return this.setImage(request, viewer, pageId, 'background');
+  }
+
+  /** Take the page's background off. */
+  @Delete('background')
+  @HttpCode(204)
+  removeBackground(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string): Promise<void> {
+    return this.removeImage(request, viewer, pageId, 'background');
+  }
+
+  /** How opaque the background is, a whole number of percent from 0 to 100. 25 until changed. */
+  @Put('background-opacity')
+  @HttpCode(204)
+  async backgroundOpacity(@Req() request: Request, @CurrentViewer() viewer: Viewer, @Param('pageId') pageId: string, @Body() body: BackgroundOpacityRequest): Promise<void> {
+    const raw = body && typeof body === 'object' ? (body as unknown as Record<string, unknown>).opacity : undefined;
+    const result = UUID.test(pageId)
+      ? await this.settings.setBackgroundOpacity(requestContext(request), viewer.accountId, pageId, typeof raw === 'number' ? raw : Number.NaN)
+      : 'not_found';
+    if (result === 'not_found') throw noPage();
+    if (result === 'bad_opacity') throw new BadRequestException('opacity must be a whole number from 0 to 100.');
   }
 
   private async setImage(request: Request, viewer: Viewer, pageId: string, kind: PageImage): Promise<UploadedImage> {
