@@ -8,7 +8,7 @@ import { Problem } from '../common/problem.js';
 import { requestContext } from '../common/request-context.js';
 import { uploadedBytes } from '../common/upload.js';
 import { AccentRequest, BackgroundOpacityRequest, HiddenLinkRequest, Preferences, UploadedImage, PreferencesPatch, SocialsRequest } from './page-settings.dto.js';
-import { IMAGE_LIMIT, PageSettingsService, type PageImage } from './page-settings.service.js';
+import { IMAGE_LIMITS, PageSettingsService, type PageImage } from './page-settings.service.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -63,8 +63,8 @@ export class PageSettingsController {
 
   /**
    * A banner of the page's own, shown instead of VRChat's: the picture's own
-   * bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB. Fitted inside
-   * 1600 pixels.
+   * bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB (any size for an
+   * admin). Fitted inside 1600 pixels.
    */
   @Put('banner')
   @HttpCode(200)
@@ -83,8 +83,8 @@ export class PageSettingsController {
 
   /**
    * A picture of the page's own, shown instead of the VRChat icon: the
-   * picture's own bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB. Cut
-   * to a square from its middle, 512 pixels across.
+   * picture's own bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB (any
+   * size for an admin). Cut to a square from its middle, 512 pixels across.
    */
   @Put('picture')
   @HttpCode(200)
@@ -103,7 +103,8 @@ export class PageSettingsController {
 
   /**
    * A background drawn behind the whole page: the picture's own bytes as the
-   * body, PNG, JPEG, WebP or GIF, up to 8 MB. Fitted inside 2560 pixels.
+   * body, PNG, JPEG, WebP or GIF, up to 16 MB (any size for an admin).
+   * Fitted inside 2560 pixels.
    */
   @Put('background')
   @HttpCode(200)
@@ -142,7 +143,7 @@ export class PageSettingsController {
       case 'not_found':
         throw noPage();
       case 'too_large':
-        throw new Problem(413, 'too_large', `A picture can be up to ${IMAGE_LIMIT / 1024 / 1024} MB.`);
+        throw new Problem(413, 'too_large', `A ${kind} can be up to ${IMAGE_LIMITS[kind] / 1024 / 1024} MB.`);
       default:
         throw new Problem(400, 'not_a_picture', 'That isn’t a picture vrc.page can use. Try a PNG, JPEG or WebP.');
     }

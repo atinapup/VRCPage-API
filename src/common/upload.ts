@@ -10,8 +10,13 @@ export type UploadKind = 'png' | 'jpeg' | 'gif' | 'webp' | 'mp4' | 'webm';
 /** The content types main.ts reads as raw bytes. */
 export const UPLOAD_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'video/mp4', 'video/webm'];
 
-/** The largest upload main.ts will read, in bytes: 25 MB. Each endpoint has its own, lower or equal. */
-export const UPLOAD_LIMIT = 25 * 1024 * 1024;
+/**
+ * The largest upload main.ts will read, in bytes: 100 MB. Each endpoint has
+ * its own, lower or equal; this is the only one an admin's page images meet,
+ * there as a guard on memory, since every upload is held whole while sharp
+ * reads it.
+ */
+export const UPLOAD_LIMIT = 100 * 1024 * 1024;
 
 /** What the bytes really are, or null for anything else. */
 export function sniff(bytes: Buffer): UploadKind | null {

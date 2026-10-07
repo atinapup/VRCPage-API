@@ -22,11 +22,17 @@ import { PagesService } from './pages.service.js';
 /** #rrggbb, lowercase on the way in. */
 const ACCENT = /^#[0-9a-f]{6}$/;
 
-/** No picture, banner or background needs to be bigger than this to look right. */
-export const IMAGE_LIMIT = 8 * 1024 * 1024;
-
 /** A page's own picture, banner and background, uploaded on vrc.page. */
 export type PageImage = 'picture' | 'banner' | 'background';
+
+const MB = 1024 * 1024;
+
+/**
+ * The most each can be, in bytes. A background covers the whole window, so
+ * it gets more room. Admins have no limit of their own: theirs only meet
+ * UPLOAD_LIMIT (src/common/upload.ts), the most the API reads at all.
+ */
+export const IMAGE_LIMITS: Record<PageImage, number> = { picture: 8 * MB, banner: 8 * MB, background: 16 * MB };
 
 const COLUMN = { picture: 'pictureImageId', banner: 'bannerImageId', background: 'backgroundImageId' } as const;
 
@@ -110,7 +116,8 @@ export class PageSettingsService {
    * 20261003090000).
    */
   async setImage(context: RequestContext, accountId: string, pageId: string, kind: PageImage, bytes: Buffer): Promise<ImageResult> {
-    if (bytes.length > IMAGE_LIMIT) return { status: 'too_large' };
+    // Only a file over the limit costs the look-up.
+    if (bytes.length > IMAGE_LIMITS[kind] && !(await this.pages.isAdmin(accountId))) return { status: 'too_large' };
     const type = sniff(bytes);
     if (type !== 'png' && type !== 'jpeg' && type !== 'webp' && type !== 'gif') return { status: 'not_a_picture' };
     const encoded = await encodeUpload(bytes, kind);

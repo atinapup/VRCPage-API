@@ -4,7 +4,7 @@ import type { Transaction } from 'kysely';
 import sharp from 'sharp';
 import { Audit } from '../audit/audit.js';
 import type { RequestContext } from '../common/request-context.js';
-import { sniff, UPLOAD_LIMIT } from '../common/upload.js';
+import { sniff } from '../common/upload.js';
 import { Database } from '../database/database.js';
 import type { DB } from '../database/database.types.js';
 import type { AdminUpdate, Update, UpdatesFeed } from './news.dto.js';
@@ -15,9 +15,12 @@ import type { AdminUpdate, Update, UpdatesFeed } from './news.dto.js';
  *
  * A picture (GIFs included) is re-encoded to WebP, keeping its animation and
  * dropping anything else the file carried. A clip is kept as it was sent,
- * MP4 or WebM, up to UPLOAD_LIMIT. Both are named by the hash of what is
+ * MP4 or WebM, up to MEDIA_LIMIT. Both are named by the hash of what is
  * stored, and served at /updates/media/<hex>.<ext> on the website.
  */
+
+/** The largest picture or clip an update takes: 25 MB. */
+const MEDIA_LIMIT = 25 * 1024 * 1024;
 
 /** Pictures in an update fill a dialog about 560px wide. */
 const MEDIA_BOX = 1600;
@@ -169,7 +172,7 @@ export class NewsService {
 
   /** Attach a picture or clip, replacing any there was. Checked and encoded before anything is written. */
   async setMedia(context: RequestContext, adminId: string, id: string, bytes: Buffer): Promise<MediaResult> {
-    if (bytes.length > UPLOAD_LIMIT) return 'not_media';
+    if (bytes.length > MEDIA_LIMIT) return 'not_media';
     const kind = sniff(bytes);
     let stored: { bytes: Buffer; contentType: string; width: number | null; height: number | null };
     if (kind === 'mp4' || kind === 'webm') {

@@ -1536,7 +1536,7 @@
             }
           }
         },
-        "summary": "A banner of the page's own, shown instead of VRChat's: the picture's own\nbytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB. Fitted inside\n1600 pixels.",
+        "summary": "A banner of the page's own, shown instead of VRChat's: the picture's own\nbytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB (any size for an\nadmin). Fitted inside 1600 pixels.",
         "tags": [
           "me"
         ]
@@ -1638,7 +1638,7 @@
             }
           }
         },
-        "summary": "A picture of the page's own, shown instead of the VRChat icon: the\npicture's own bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB. Cut\nto a square from its middle, 512 pixels across.",
+        "summary": "A picture of the page's own, shown instead of the VRChat icon: the\npicture's own bytes as the body, PNG, JPEG, WebP or GIF, up to 8 MB (any\nsize for an admin). Cut to a square from its middle, 512 pixels across.",
         "tags": [
           "me"
         ]
@@ -1740,7 +1740,7 @@
             }
           }
         },
-        "summary": "A background drawn behind the whole page: the picture's own bytes as the\nbody, PNG, JPEG, WebP or GIF, up to 8 MB. Fitted inside 2560 pixels.",
+        "summary": "A background drawn behind the whole page: the picture's own bytes as the\nbody, PNG, JPEG, WebP or GIF, up to 16 MB (any size for an admin).\nFitted inside 2560 pixels.",
         "tags": [
           "me"
         ]
